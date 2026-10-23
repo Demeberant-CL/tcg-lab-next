@@ -7,6 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -18,6 +21,11 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import com.tcglab.next.data.Catalog
+import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
 import com.tcglab.next.data.TcgDatabase
 
@@ -84,31 +92,42 @@ private fun TcgLabNextApp(database: TcgDatabase) {
     }
 }
 
-@Composable private fun CollectionScreen(modifier: Modifier, cards: List<CollectionCard>) {
+@Composable private fun CollectionScreen(modifier: Modifier, catalog: List<CatalogCard>, holdings: List<CollectionCard>) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("Todas") }
-    val visible = cards.filter { card ->
-        (filter == "Todas" || card.category == filter) &&
-        (query.isBlank() || card.name.contains(query, ignoreCase = true))
+    val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
+    val visible = remember(query, filter, catalog) {
+        val q = query.trim()
+        catalog.asSequence()
+            .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
+            .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
+            .take(160)
+            .toList()
     }
-    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Colección", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(cards.sumOf { it.quantity }.toString() + " cartas registradas", color = Muted)
-        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Buscar carta...") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true)
+        Text("${holdings.sumOf { it.quantity }} cartas registradas · ${catalog.size} en catálogo", color = Muted)
+        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Buscar carta o ID...") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Todas", "Pokémon", "Entrenadores").forEach { option ->
                 FilterChip(filter == option, { filter = option }, { Text(option) })
             }
         }
-        if (visible.isEmpty()) {
-            EmptyCard("Colección vacía", "Aquí aparecerán las cartas registradas.")
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(visible, key = { it.key }) { card ->
-                    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), color = Surface) {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.SemiBold); Text(card.setCode + " · " + card.number, color = Muted) }
-                            Text("×" + card.quantity, fontWeight = FontWeight.Bold, color = Accent)
+        LazyVerticalGrid(columns = GridCells.Fixed(2), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
+            items(visible, key = { "${it.set}#${it.number}" }) { card ->
+                val key = "${card.set}#${card.number}"
+                val quantity = holdingByKey[key]?.quantity ?: 0
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
+                    Column {
+                        AsyncImage(model = Catalog.imageUrl(card), contentDescription = card.name, modifier = Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Fit)
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(card.name, maxLines = 2, fontWeight = FontWeight.SemiBold)
+                            Text("${card.set} · ${card.number} · ${card.rarity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                IconButton(onClick = {}) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
+                                Text("×$quantity", fontWeight = FontWeight.Bold, color = if (quantity > 0) Accent else Muted)
+                                IconButton(onClick = {}) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
+                            }
                         }
                     }
                 }
