@@ -58,7 +58,7 @@ private fun TcgLabNextApp(database: TcgDatabase) {
         }) { padding ->
             when (selected) {
                 0 -> HomeScreen(Modifier.padding(padding), cards.value.size) { selected = 3 }
-                1 -> CollectionScreen(Modifier.padding(padding), cards.value)
+                1 -> CollectionScreen(Modifier.padding(padding), catalogCards, cards.value, database) { cards.value = database.getCards() }
                 2 -> DecksScreen(Modifier.padding(padding))
                 else -> StrategyScreen(Modifier.padding(padding))
             }
