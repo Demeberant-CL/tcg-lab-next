@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -16,6 +18,8 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tcglab.next.data.CollectionCard
+import com.tcglab.next.data.TcgDatabase
 
 private val Background = Color(0xFF080C13)
 private val Surface = Color(0xFF111823)
@@ -24,15 +28,19 @@ private val Accent = Color(0xFF58A6FF)
 private val Muted = Color(0xFF8E9AAA)
 
 class MainActivity : ComponentActivity() {
+    private lateinit var database: TcgDatabase
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { TcgLabNextApp() }
+        database = TcgDatabase(this)
+        setContent { TcgLabNextApp(database) }
     }
+    override fun onDestroy() { database.close(); super.onDestroy() }
 }
 
 @Composable
-private fun TcgLabNextApp() {
+private fun TcgLabNextApp(database: TcgDatabase) {
     var selected by remember { mutableIntStateOf(0) }
+    val cards = remember { mutableStateOf(database.getCards()) }
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent, background = Background, surface = Surface)) {
         Scaffold(containerColor = Background, bottomBar = {
             NavigationBar(containerColor = Surface) {
@@ -42,8 +50,8 @@ private fun TcgLabNextApp() {
             }
         }) { padding ->
             when (selected) {
-                0 -> HomeScreen(Modifier.padding(padding)) { selected = 3 }
-                1 -> CollectionScreen(Modifier.padding(padding))
+                0 -> HomeScreen(Modifier.padding(padding), cards.value.size) { selected = 3 }
+                1 -> CollectionScreen(Modifier.padding(padding), cards.value)
                 2 -> DecksScreen(Modifier.padding(padding))
                 else -> StrategyScreen(Modifier.padding(padding))
             }
@@ -51,7 +59,7 @@ private fun TcgLabNextApp() {
     }
 }
 
-@Composable private fun HomeScreen(modifier: Modifier, onStrategy: () -> Unit) {
+@Composable private fun HomeScreen(modifier: Modifier, cardCount: Int, onStrategy: () -> Unit) {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text("TCG LAB", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black); Text("Laboratorio de estrategia", color = Muted) }
@@ -61,17 +69,14 @@ private fun TcgLabNextApp() {
             Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF193451), Surface2))).padding(24.dp)) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.AutoAwesome, null, tint = Accent); Spacer(Modifier.width(10.dp)); Text("ESTRATEGIA IA", color = Accent, fontWeight = FontWeight.Bold) }
-                    Spacer(Modifier.height(12.dp))
-                    Text("Construye tu próximo mazo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(7.dp))
-                    Text("Analiza tu colección y recibe una propuesta de 20 cartas con explicación estratégica.", color = Muted)
-                    Spacer(Modifier.height(20.dp))
-                    Button(onStrategy, shape = RoundedCornerShape(14.dp)) { Text("Analizar colección", fontWeight = FontWeight.Bold) }
+                    Spacer(Modifier.height(12.dp)); Text("Construye tu próximo mazo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(7.dp)); Text("Analiza tu colección y recibe una propuesta de 20 cartas con explicación estratégica.", color = Muted)
+                    Spacer(Modifier.height(20.dp)); Button(onStrategy, shape = RoundedCornerShape(14.dp)) { Text("Analizar colección", fontWeight = FontWeight.Bold) }
                 }
             }
         }
         Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
-            StatCard("CARTAS", "0", Icons.Outlined.CollectionsBookmark, Modifier.weight(1f))
+            StatCard("CARTAS", cardCount.toString(), Icons.Outlined.CollectionsBookmark, Modifier.weight(1f))
             StatCard("MAZOS", "0", Icons.Outlined.GridView, Modifier.weight(1f))
         }
         Text("Actividad reciente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -79,15 +84,36 @@ private fun TcgLabNextApp() {
     }
 }
 
-@Composable private fun CollectionScreen(modifier: Modifier) {
+@Composable private fun CollectionScreen(modifier: Modifier, cards: List<CollectionCard>) {
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("Todas") }
+    val visible = cards.filter { card ->
+        (filter == "Todas" || card.category == filter) &&
+        (query.isBlank() || card.name.contains(query, ignoreCase = true))
+    }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Colección", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Cartas disponibles", color = Muted)
-        OutlinedTextField(value = "", onValueChange = {}, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Buscar carta...") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true)
+        Text(cards.sumOf { it.quantity }.toString() + " cartas registradas", color = Muted)
+        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Buscar carta...") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(true, {}, { Text("Todas") }); FilterChip(false, {}, { Text("Pokémon") }); FilterChip(false, {}, { Text("Entrenadores") })
+            listOf("Todas", "Pokémon", "Entrenadores").forEach { option ->
+                FilterChip(filter == option, { filter = option }, { Text(option) })
+            }
         }
-        EmptyCard("Colección vacía", "Aquí aparecerán las cartas registradas.")
+        if (visible.isEmpty()) {
+            EmptyCard("Colección vacía", "Aquí aparecerán las cartas registradas.")
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(visible, key = { it.key }) { card ->
+                    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), color = Surface) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.SemiBold); Text(card.setCode + " · " + card.number, color = Muted) }
+                            Text("×" + card.quantity, fontWeight = FontWeight.Bold, color = Accent)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
