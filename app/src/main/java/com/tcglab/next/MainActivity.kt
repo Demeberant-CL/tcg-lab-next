@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Button
@@ -38,13 +41,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-private val Navy = Color(0xFF0A0F18)
-private val Panel = Color(0xFF121A27)
-private val Accent = Color(0xFF4DA3FF)
+private val Background = Color(0xFF080C13)
+private val Surface = Color(0xFF111823)
+private val Surface2 = Color(0xFF172231)
+private val Accent = Color(0xFF58A6FF)
+private val Muted = Color(0xFF8E9AAA)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,26 +62,28 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun TcgLabNextApp() {
     var selected by remember { mutableIntStateOf(0) }
+
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme.copy(
             primary = Accent,
-            background = Navy,
-            surface = Panel,
+            background = Background,
+            surface = Surface,
         ),
     ) {
         Scaffold(
-            containerColor = Navy,
+            containerColor = Background,
             bottomBar = {
                 NavigationBar(
                     modifier = Modifier.navigationBarsPadding(),
-                    containerColor = Panel,
+                    containerColor = Surface,
                 ) {
-                    listOf(
-                        "Inicio" to Icons.Outlined.Style,
+                    val items = listOf(
+                        "Inicio" to Icons.Outlined.Home,
                         "Colección" to Icons.Outlined.CollectionsBookmark,
-                        "Mazos" to Icons.Outlined.Style,
+                        "Mazos" to Icons.Outlined.GridView,
                         "Estrategia" to Icons.Outlined.AutoAwesome,
-                    ).forEachIndexed { index, item ->
+                    )
+                    items.forEachIndexed { index, item ->
                         NavigationBarItem(
                             selected = selected == index,
                             onClick = { selected = index },
@@ -87,13 +95,10 @@ private fun TcgLabNextApp() {
             },
         ) { padding ->
             when (selected) {
-                0 -> HomeScreen(
-                    modifier = Modifier.padding(padding),
-                    onStrategy = { selected = 3 },
-                )
-                1 -> PlaceholderScreen("Colección", "La colección visual será el siguiente módulo.")
-                2 -> PlaceholderScreen("Mazos", "Los mazos guardados serán de solo lectura.")
-                else -> PlaceholderScreen("Estrategia IA", "Aquí comenzará la generación de mazos con IA.")
+                0 -> HomeScreen(Modifier.padding(padding)) { selected = 3 }
+                1 -> ModuleScreen("Colección", "Tus cartas", "Consulta, busca y administra las cartas disponibles.")
+                2 -> ModuleScreen("Mazos", "Mazos guardados", "Revisa tus mazos y su composición.")
+                else -> StrategyScreen()
             }
         }
     }
@@ -103,82 +108,119 @@ private fun TcgLabNextApp() {
 private fun HomeScreen(modifier: Modifier = Modifier, onStrategy: () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("TCG LAB", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Laboratorio de estrategia", color = Color.LightGray)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
+                Text("TCG LAB", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                Text("Laboratorio de estrategia", color = Muted)
             }
             IconButton(onClick = {}) {
-                Icon(Icons.Outlined.Settings, contentDescription = "Ajustes")
+                Icon(Icons.Outlined.Settings, contentDescription = "Ajustes", tint = Muted)
             }
         }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Panel),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = Surface2),
         ) {
-            Column(modifier = Modifier.padding(22.dp)) {
-                Text("Estrategia IA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Analiza la colección y propone un mazo válido, explicando las decisiones.",
-                    color = Color.LightGray,
-                )
-                Spacer(Modifier.height(18.dp))
-                Button(onClick = onStrategy) {
-                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
-                    Spacer(Modifier.padding(4.dp))
-                    Text("Analizar colección")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF162B45), Surface2)
+                        )
+                    )
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.AutoAwesome, null, tint = Accent, modifier = Modifier.size(28.dp))
+                        Spacer(Modifier.size(10.dp))
+                        Text("ESTRATEGIA IA", color = Accent, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Construye tu próximo mazo",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "Analiza tu colección y recibe una propuesta de 20 cartas con explicación estratégica.",
+                        color = Muted,
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = onStrategy, shape = RoundedCornerShape(14.dp)) {
+                        Text("Analizar colección", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetricCard("Colección", "0", Modifier.weight(1f))
-            MetricCard("Mazos", "0", Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard("CARTAS", "0", Icons.Outlined.CollectionsBookmark, Modifier.weight(1f))
+            StatCard("MAZOS", "0", Icons.Outlined.Style, Modifier.weight(1f))
         }
+
+        Text("Actividad reciente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            color = Panel,
+            color = Surface,
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Text("Actividad reciente", fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
-                Text("Sin actividad registrada.", color = Color.Gray)
+            Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.GridView, null, tint = Muted)
+                Spacer(Modifier.size(12.dp))
+                Column {
+                    Text("Aún no hay actividad", fontWeight = FontWeight.SemiBold)
+                    Text("Crea tu primer mazo con IA.", color = Muted)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MetricCard(title: String, value: String, modifier: Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = Panel)) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Text(title, color = Color.Gray)
-            Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+private fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Surface)) {
+        Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Accent)
+            Spacer(Modifier.size(11.dp))
+            Column {
+                Text(title, color = Muted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 @Composable
-private fun PlaceholderScreen(title: String, subtitle: String) {
-    Box(
-        modifier = Modifier.fillMaxSize().background(Navy),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun ModuleScreen(title: String, heading: String, description: String) {
+    Box(Modifier.fillMaxSize().background(Background).padding(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text(subtitle, color = Color.Gray)
+            Text(heading, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(description, color = Muted)
+        }
+    }
+}
+
+@Composable
+private fun StrategyScreen() {
+    Box(Modifier.fillMaxSize().background(Background).padding(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Estrategia IA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Análisis de colección", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text("La generación del mazo y el análisis estratégico se integrarán aquí.", color = Muted)
+            Button(onClick = {}, shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Outlined.AutoAwesome, null)
+                Spacer(Modifier.size(8.dp))
+                Text("Comenzar análisis")
+            }
         }
     }
 }
