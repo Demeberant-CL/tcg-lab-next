@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -26,6 +24,7 @@ import coil.compose.AsyncImage
 import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
+import com.tcglab.next.data.DeckSummary
 import com.tcglab.next.data.TcgDatabase
 
 private val Background = Color(0xFF080C13)
@@ -38,6 +37,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var database: TcgDatabase
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Catalog.load(this)
         database = TcgDatabase(this)
         setContent { TcgLabNextApp(database) }
     }
@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 private fun TcgLabNextApp(database: TcgDatabase) {
     var selected by remember { mutableIntStateOf(0) }
     val cards = remember { mutableStateOf(database.getCards()) }
+    val decks = remember { mutableStateOf(database.getDecks()) }
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent, background = Background, surface = Surface)) {
         Scaffold(containerColor = Background, bottomBar = {
             NavigationBar(containerColor = Surface) {
@@ -57,16 +58,16 @@ private fun TcgLabNextApp(database: TcgDatabase) {
             }
         }) { padding ->
             when (selected) {
-                0 -> HomeScreen(Modifier.padding(padding), cards.value.size) { selected = 3 }
-                1 -> CollectionScreen(Modifier.padding(padding), catalogCards, cards.value, database) { cards.value = database.getCards() }
-                2 -> DecksScreen(Modifier.padding(padding))
+                0 -> HomeScreen(Modifier.padding(padding), cards.value.sumOf { it.quantity }, decks.value.size) { selected = 3 }
+                1 -> CollectionScreen(Modifier.padding(padding), Catalog.allCards(), cards.value, database) { cards.value = database.getCards() }
+                2 -> DecksScreen(Modifier.padding(padding), decks.value) { decks.value = database.getDecks() }
                 else -> StrategyScreen(Modifier.padding(padding))
             }
         }
     }
 }
 
-@Composable private fun HomeScreen(modifier: Modifier, cardCount: Int, onStrategy: () -> Unit) {
+@Composable private fun HomeScreen(modifier: Modifier, cardCount: Int, deckCount: Int, onStrategy: () -> Unit) {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text("TCG LAB", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black); Text("Laboratorio de estrategia", color = Muted) }
@@ -84,7 +85,7 @@ private fun TcgLabNextApp(database: TcgDatabase) {
         }
         Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
             StatCard("CARTAS", cardCount.toString(), Icons.Outlined.CollectionsBookmark, Modifier.weight(1f))
-            StatCard("MAZOS", "0", Icons.Outlined.GridView, Modifier.weight(1f))
+            StatCard("MAZOS", deckCount.toString(), Icons.Outlined.GridView, Modifier.weight(1f))
         }
         Text("Actividad reciente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         EmptyCard("Aún no hay actividad", "Crea tu primer mazo con IA.")
@@ -135,13 +136,31 @@ private fun TcgLabNextApp(database: TcgDatabase) {
     }
 }
 
-@Composable private fun DecksScreen(modifier: Modifier) {
+@Composable private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onChanged: () -> Unit) {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text("Mazos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Mazos guardados", color = Muted) }
+            Column(Modifier.weight(1f)) { Text("Mazos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("${decks.size} mazos guardados", color = Muted) }
             FilledTonalButton({}) { Icon(Icons.Outlined.AutoAwesome, null); Spacer(Modifier.width(6.dp)); Text("Crear con IA") }
         }
-        EmptyCard("Sin mazos", "Los mazos creados con IA aparecerán aquí.")
+        if (decks.isEmpty()) {
+            EmptyCard("Sin mazos", "Los mazos creados con IA aparecerán aquí.")
+        } else {
+            androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(decks, key = { it.id }) { deck ->
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.GridView, null, tint = Accent)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(deck.name, fontWeight = FontWeight.Bold)
+                                Text("${deck.cardCount}/20 cartas · ${deck.energyCount} energías", color = Muted)
+                            }
+                            Text(if (deck.valid) "VÁLIDO" else "REVISAR", color = if (deck.valid) Accent else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
