@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
@@ -92,7 +91,7 @@ private fun TcgLabNextApp(database: TcgDatabase) {
     }
 }
 
-@Composable private fun CollectionScreen(modifier: Modifier, catalog: List<CatalogCard>, holdings: List<CollectionCard>) {
+@Composable private fun CollectionScreen(modifier: Modifier, catalog: List<CatalogCard>, holdings: List<CollectionCard>, database: TcgDatabase, onChanged: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("Todas") }
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
@@ -124,9 +123,9 @@ private fun TcgLabNextApp(database: TcgDatabase) {
                             Text(card.name, maxLines = 2, fontWeight = FontWeight.SemiBold)
                             Text("${card.set} · ${card.number} · ${card.rarity}", color = Muted, style = MaterialTheme.typography.labelSmall)
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                IconButton(onClick = {}) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
+                                IconButton(onClick = { if (quantity > 0) { database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon")); onChanged() } }) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
                                 Text("×$quantity", fontWeight = FontWeight.Bold, color = if (quantity > 0) Accent else Muted)
-                                IconButton(onClick = {}) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
+                                IconButton(onClick = { database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon")); onChanged() }) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
                             }
                         }
                     }
