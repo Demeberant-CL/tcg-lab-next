@@ -21,6 +21,8 @@ class AiDeckClient(context: Context) {
     fun saveKey(key: String) { prefs.edit().putString("xai_key", key.trim()).apply() }
     fun currentModel(): String = prefs.getString("xai_model", "grok-4.7") ?: "grok-4.7"
     fun saveModel(model: String) { prefs.edit().putString("xai_model", model.trim().ifBlank { "grok-4.7" }).apply() }
+    fun isDarkTheme(): Boolean = prefs.getBoolean("dark_theme", true)
+    fun saveDarkTheme(dark: Boolean) { prefs.edit().putBoolean("dark_theme", dark).apply() }
 
     suspend fun generate(holdings: List<CollectionCard>, catalog: List<CatalogCard>, goal: String): Result<AiDeckProposal> = withContext(Dispatchers.IO) {
         val key = prefs.getString("xai_key", "").orEmpty()
