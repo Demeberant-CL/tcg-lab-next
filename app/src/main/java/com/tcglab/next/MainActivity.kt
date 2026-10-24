@@ -41,6 +41,7 @@ import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
 import com.tcglab.next.data.Deck
 import com.tcglab.next.data.DeckCard
+import com.tcglab.next.data.DeckSummary
 import com.tcglab.next.data.TcgDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
