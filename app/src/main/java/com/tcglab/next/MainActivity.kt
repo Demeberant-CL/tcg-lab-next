@@ -156,6 +156,13 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 SettingsScreen(
                     modifier = Modifier.padding(padding).fillMaxSize(),
                     aiClient = aiClient,
+                    database = database,
+                    onCollectionChanged = {
+                        scope.launch(Dispatchers.IO) {
+                            val updated = database.getCards()
+                            withContext(Dispatchers.Main) { cards.value = updated }
+                        }
+                    },
                     onBack = { showSettings = false }
                 )
             } else if (loading) {
@@ -854,6 +861,8 @@ private fun DeckBuilderScreen(
 private fun SettingsScreen(
     modifier: Modifier,
     aiClient: AiDeckClient,
+    database: TcgDatabase,
+    onCollectionChanged: () -> Unit = {},
     onBack: () -> Unit
 ) {
     var key by remember { mutableStateOf(aiClient.currentKey() ?: "") }
@@ -887,6 +896,49 @@ private fun SettingsScreen(
         }
         message?.let { Text(it, color = AccentSoft) }
         Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(color = Divider)
+        Text("Colección", color = Color.White, fontWeight = FontWeight.SemiBold)
+        var exportText by remember { mutableStateOf("") }
+        var importText by remember { mutableStateOf("") }
+        Button(onClick = {
+            exportText = database.exportCollectionJson()
+            message = "Colección exportada"
+        }) { Text("Exportar JSON") }
+        if (exportText.isNotBlank()) {
+            OutlinedTextField(
+                value = exportText,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                readOnly = true,
+                label = { Text("JSON exportado") }
+            )
+        }
+        OutlinedTextField(
+            value = importText,
+            onValueChange = { importText = it },
+            modifier = Modifier.fillMaxWidth().height(100.dp),
+            label = { Text("Pegar JSON para importar") }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                try {
+                    val n = database.importCollectionJson(importText, "merge")
+                    message = "Importadas $n cartas (modo sumar)"
+                    onCollectionChanged()
+                } catch (e: Exception) {
+                    message = "Error al importar: ${e.message}"
+                }
+            }, enabled = importText.isNotBlank()) { Text("Importar (sumar)") }
+            OutlinedButton(onClick = {
+                try {
+                    val n = database.importCollectionJson(importText, "replace")
+                    message = "Importadas $n cartas (reemplazó todo)"
+                    onCollectionChanged()
+                } catch (e: Exception) {
+                    message = "Error al importar: ${e.message}"
+                }
+            }, enabled = importText.isNotBlank()) { Text("Reemplazar") }
+        }
         HorizontalDivider(color = Divider)
         Text("Versión", color = Color.White, fontWeight = FontWeight.SemiBold)
         Text("TCG LAB NEXT · en desarrollo", color = Muted)

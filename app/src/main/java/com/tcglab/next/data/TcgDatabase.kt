@@ -3,6 +3,8 @@ package com.tcglab.next.data
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class CollectionCard(
     val key: String,
