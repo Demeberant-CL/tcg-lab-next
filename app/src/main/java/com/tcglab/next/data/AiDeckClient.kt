@@ -22,7 +22,24 @@ class AiDeckClient(context: Context) {
     private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(180, TimeUnit.SECONDS).build()
     fun hasKey(): Boolean = currentKey() != null
     fun currentKey(): String? = keyStore.get()?.takeIf { it.isNotBlank() }
-    fun saveKey(key: String) { keyStore.put(key) }
+    fun saveKey(key: String) { keyStore.put(key.trim()) }
+    suspend fun testConnection(): Result<List<String>> = withContext(Dispatchers.IO) {
+        val key = currentKey() ?: return@withContext Result.failure(IllegalStateException("Configura primero una clave de xAI."))
+        try {
+            val request = Request.Builder().url("https://api.x.ai/v1/models")
+                .addHeader("Authorization", "Bearer $key").get().build()
+            http.newCall(request).execute().use { response ->
+                val raw = response.body?.string().orEmpty()
+                if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(response.code)))
+                val data = JSONObject(raw).optJSONArray("data") ?: JSONArray()
+                Result.success(buildList { for (i in 0 until data.length()) data.optJSONObject(i)?.optString("id")?.takeIf { it.isNotBlank() }?.let(::add) })
+            }
+        } catch (_: java.net.SocketTimeoutException) {
+            Result.failure(IllegalStateException("Tiempo de espera agotado. Comprueba tu conexión."))
+        } catch (_: java.io.IOException) {
+            Result.failure(IllegalStateException("No se pudo conectar con xAI. Comprueba tu conexión."))
+        }
+    }
     fun clearKey() { keyStore.clear() }
     fun currentModel(): String = prefs.getString("xai_model", DEFAULT_MODEL)?.ifBlank { DEFAULT_MODEL } ?: DEFAULT_MODEL
     fun saveModel(model: String) { prefs.edit().putString("xai_model", model.trim().ifBlank { DEFAULT_MODEL }).apply() }
@@ -94,7 +111,7 @@ class AiDeckClient(context: Context) {
         try {
             http.newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
-                if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException("xAI respondió ${response.code}. Revisa la clave y los créditos."))
+                if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(response.code)))
                 val root = JSONObject(raw)
                 val output = root.optString("output_text").ifBlank {
                     val out = root.optJSONArray("output") ?: JSONArray()
@@ -159,6 +176,6 @@ class AiDeckClient(context: Context) {
                 if (!deck.isValid) return@withContext Result.failure(IllegalStateException("La IA devolvió un mazo que no cumple las 20 cartas."))
                 Result.success(AiDeckProposal(deck, json.optString("explanation").ifBlank { "Propuesta generada desde la colección." }))
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (_: java.net.SocketTimeoutException) {\n            Result.failure(IllegalStateException("Tiempo de espera agotado. Puedes reintentar."))\n        } catch (e: java.io.IOException) {\n            Result.failure(IllegalStateException("No se pudo conectar con xAI. Comprueba tu conexión."))\n        } catch (e: Exception) {\n            Result.failure(IllegalStateException(e.message ?: "Respuesta de IA no válida."))\n        }\n    }\n\n    private fun httpError(code: Int): String = when (code) {\n        401 -> "Clave xAI inválida o no autorizada."\n        402 -> "La cuenta de xAI no tiene créditos disponibles."\n        403 -> "xAI rechazó el acceso para esta clave."\n        404 -> "Modelo o endpoint de xAI no encontrado."\n        429 -> "xAI está limitando las solicitudes. Espera unos segundos y reintenta."\n        in 500..599 -> "xAI presenta un problema temporal. Reintenta más tarde."\n        else -> "xAI respondió con HTTP $code."\n    }
     }
 }
