@@ -75,7 +75,7 @@ class AiDeckClient(context: Context) {
                 .put("schema", cardSchema)
                 .put("strict", true))
         val body = JSONObject()
-            .put("model", "grok-4.7")
+            .put("model", currentModel())
             .put("input", prompt)
             .put("temperature", 0.7)
             .put("top_p", 0.95)
