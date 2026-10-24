@@ -73,7 +73,7 @@ class AiDeckClient(context: Context) {
                     val item = cardsJson.getJSONObject(i)
                     val set = item.getString("set"); val number = item.getInt("number"); val quantity = item.getInt("quantity")
                     val cc = catalog.find { it.set.equals(set, true) && it.number == number } ?: return@withContext Result.failure(IllegalStateException("Carta inexistente: $set#$number"))
-                    val ownedQty = holdings.firstOrNull { it.setCode.equals(set, true) && it.number == number }?.quantity ?: 0
+                    val ownedQty = holdings.firstOrNull { it.setCode.equals(set, true) && it.number == number.toString() }?.quantity ?: 0
                     if (quantity !in 1..2 || quantity > ownedQty) return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de ${cc.name} de las disponibles."))
                     cards += DeckCard(set, number.toString(), cc.name, if (cc.trainer) "Entrenadores" else "Pokémon", quantity, Catalog.imageUrl(cc), cc.entityId)
                 }
