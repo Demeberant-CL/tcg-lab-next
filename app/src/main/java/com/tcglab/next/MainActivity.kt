@@ -426,14 +426,15 @@ private fun CollectionScreen(
             .filter { !showWishlistOnly || "${it.set}#${it.number}" in wishlist }
             .toList()
     }
-    val uniqueOwned = holdings.distinctBy { it.key }.size
-    val progress = if (catalog.isNotEmpty()) uniqueOwned.toFloat() / catalog.size else 0f
+    val filteredCatalog = if (setFilter == "Todos") catalog else catalog.filter { it.set == setFilter }
+    val uniqueOwned = holdings.filter { setFilter == "Todos" || it.setCode == setFilter }.distinctBy { it.key }.size
+    val progress = if (filteredCatalog.isNotEmpty()) uniqueOwned.toFloat() / filteredCatalog.size else 0f
     Column(
         modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Colección", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${catalog.size} únicas", color = Muted)
+        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${filteredCatalog.size} únicas${if (setFilter != "Todos") " ($setFilter)" else ""}", color = Muted)
         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = Accent)
         OutlinedTextField(
             value = query,
@@ -916,6 +917,20 @@ private fun SettingsScreen(
         }
         message?.let { Text(it, color = AccentSoft) }
         Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(color = Divider)
+        Text("Modelo de IA", color = Color.White, fontWeight = FontWeight.SemiBold)
+        var model by remember { mutableStateOf(aiClient.currentModel()) }
+        OutlinedTextField(
+            value = model,
+            onValueChange = { model = it },
+            label = { Text("Modelo (ej. grok-4.7)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Button(onClick = {
+            aiClient.saveModel(model.trim())
+            message = "Modelo guardado: ${aiClient.currentModel()}"
+        }) { Text("Guardar modelo") }
         HorizontalDivider(color = Divider)
         Text("Colección", color = Color.White, fontWeight = FontWeight.SemiBold)
         var exportText by remember { mutableStateOf("") }
