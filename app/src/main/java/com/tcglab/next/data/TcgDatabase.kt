@@ -239,4 +239,52 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
             writableDatabase.endTransaction()
         }
     }
+
+    fun exportCollectionJson(): String {
+        val arr = JSONArray()
+        getCards().forEach { c ->
+            arr.put(JSONObject().apply {
+                put("key", c.key)
+                put("name", c.name)
+                put("setCode", c.setCode)
+                put("number", c.number)
+                put("quantity", c.quantity)
+                put("imageUrl", c.imageUrl)
+                put("category", c.category)
+            })
+        }
+        return arr.toString(2)
+    }
+
+    fun importCollectionJson(json: String, mode: String = "merge"): Int {
+        val arr = JSONArray(json)
+        var imported = 0
+        writableDatabase.beginTransaction()
+        try {
+            if (mode == "replace") {
+                writableDatabase.delete("collection_cards", null, null)
+            }
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val card = CollectionCard(
+                    key = o.getString("key"),
+                    name = o.getString("name"),
+                    setCode = o.getString("setCode"),
+                    number = o.getString("number"),
+                    quantity = o.getInt("quantity"),
+                    imageUrl = o.optString("imageUrl", ""),
+                    category = o.optString("category", "Pokémon")
+                )
+                if (card.quantity > 0) {
+                    saveCard(card)
+                    imported++
+                }
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+        return imported
+    }
+
 }
