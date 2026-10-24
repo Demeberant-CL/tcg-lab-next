@@ -16,14 +16,23 @@ jobs:
           java-version: '17'
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Verify Gradle
+        run: gradle --version
+      - name: Lint
+        run: gradle lint --no-daemon
+      - name: Unit tests
+        run: gradle testDebugUnitTest --no-daemon
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
-      - name: Verify INTERNET permission
+        run: gradle assembleDebug --no-daemon
+      - name: Verify INTERNET permission in APK
         run: |
-          # Verify in source manifest (reliable) and confirm APK was produced
-          grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          echo "INTERNET permission present and APK built"
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT2="$(find "$ANDROID_HOME" -name aapt2 -type f | head -n 1)"
+          test -n "$AAPT2"
+          "$AAPT2" dump permissions "$APK" | grep -q 'android.permission.INTERNET'
+          "$AAPT2" dump permissions "$APK" | grep -q 'android.permission.ACCESS_NETWORK_STATE'
+          echo "APK permissions verified"
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
