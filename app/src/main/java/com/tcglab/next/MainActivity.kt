@@ -197,7 +197,8 @@ private fun TcgLabNextApp(
                     state.collection,
                     database,
                     aiClient
-                , onDeckSaved = { viewModel.refreshDecks() }\n                )
+                , onDeckSaved = { viewModel.refreshDecks() }
+                )
             }
         }
     }
