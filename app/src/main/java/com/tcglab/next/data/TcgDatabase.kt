@@ -158,18 +158,50 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
 
 
     fun getDecks(): List<DeckSummary> {
-        val result = mutableListOf<DeckSummary>()
-        readableDatabase.rawQuery(
-            "SELECT id,name FROM decks ORDER BY updated_at DESC", null
-        ).use { cursor ->
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(0)
-                val name = cursor.getString(1)
-                val deck = getDeck(id) ?: continue
-                result += DeckSummary(id, name, deck.totalCards, deck.energies.size, deck.isValid)
+        val db = readableDatabase
+        val names = mutableListOf<Pair<Long, String>>()
+        db.rawQuery("SELECT id,name FROM decks ORDER BY updated_at DESC", null).use { cursor ->
+            while (cursor.moveToNext()) names += cursor.getLong(0) to cursor.getString(1)
+        }
+
+        val cardsByDeck = mutableMapOf<Long, MutableList<DeckCard>>()
+        db.query(
+            "deck_cards",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "deck_id ASC, name ASC"
+        ).use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(c.getColumnIndexOrThrow("deck_id"))
+                cardsByDeck.getOrPut(id) { mutableListOf() }.add(
+                    DeckCard(
+                        c.getString(c.getColumnIndexOrThrow("set_code")),
+                        c.getString(c.getColumnIndexOrThrow("number")),
+                        c.getString(c.getColumnIndexOrThrow("name")),
+                        c.getString(c.getColumnIndexOrThrow("category")),
+                        c.getInt(c.getColumnIndexOrThrow("quantity")),
+                        c.getString(c.getColumnIndexOrThrow("image_url")),
+                        c.getInt(c.getColumnIndexOrThrow("entity_id"))
+                    )
+                )
             }
         }
-        return result
+
+        val energiesByDeck = mutableMapOf<Long, MutableList<Int>>()
+        db.query("deck_energies", null, null, null, null, null, "deck_id ASC, energy_id ASC").use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(c.getColumnIndexOrThrow("deck_id"))
+                energiesByDeck.getOrPut(id) { mutableListOf() }.add(c.getInt(c.getColumnIndexOrThrow("energy_id")))
+            }
+        }
+
+        return names.map { (id, name) ->
+            val deck = Deck(id, name, cardsByDeck[id].orEmpty(), energiesByDeck[id].orEmpty())
+            DeckSummary(id, name, deck.totalCards, deck.energies.size, deck.isValid)
+        }
     }
 
     fun getDeck(id: Long): Deck? {
