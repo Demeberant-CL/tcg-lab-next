@@ -128,7 +128,11 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 }
             }
         ) { padding ->
-            when (selected) {
+            if (loading) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Accent)
+                }
+            } else when (selected) {
                 0 -> HomeScreen(
                     Modifier.padding(padding),
                     cards.value.sumOf { it.quantity },
