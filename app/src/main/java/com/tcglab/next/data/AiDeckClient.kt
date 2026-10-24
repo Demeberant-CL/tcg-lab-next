@@ -176,6 +176,22 @@ class AiDeckClient(context: Context) {
                 if (!deck.isValid) return@withContext Result.failure(IllegalStateException("La IA devolvió un mazo que no cumple las 20 cartas."))
                 Result.success(AiDeckProposal(deck, json.optString("explanation").ifBlank { "Propuesta generada desde la colección." }))
             }
-        } catch (_: java.net.SocketTimeoutException) {\n            Result.failure(IllegalStateException("Tiempo de espera agotado. Puedes reintentar."))\n        } catch (e: java.io.IOException) {\n            Result.failure(IllegalStateException("No se pudo conectar con xAI. Comprueba tu conexión."))\n        } catch (e: Exception) {\n            Result.failure(IllegalStateException(e.message ?: "Respuesta de IA no válida."))\n        }\n    }\n\n    private fun httpError(code: Int): String = when (code) {\n        401 -> "Clave xAI inválida o no autorizada."\n        402 -> "La cuenta de xAI no tiene créditos disponibles."\n        403 -> "xAI rechazó el acceso para esta clave."\n        404 -> "Modelo o endpoint de xAI no encontrado."\n        429 -> "xAI está limitando las solicitudes. Espera unos segundos y reintenta."\n        in 500..599 -> "xAI presenta un problema temporal. Reintenta más tarde."\n        else -> "xAI respondió con HTTP $code."\n    }
+        } catch (_: java.net.SocketTimeoutException) {
+            Result.failure(IllegalStateException("Tiempo de espera agotado. Puedes reintentar."))
+        } catch (_: java.io.IOException) {
+            Result.failure(IllegalStateException("No se pudo conectar con xAI. Comprueba tu conexión."))
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException(e.message ?: "Respuesta de IA no válida."))
+        }
+    }
+
+    private fun httpError(code: Int): String = when (code) {
+        401 -> "Clave xAI inválida o no autorizada."
+        402 -> "La cuenta de xAI no tiene créditos disponibles."
+        403 -> "xAI rechazó el acceso para esta clave."
+        404 -> "Modelo o endpoint de xAI no encontrado."
+        429 -> "xAI está limitando las solicitudes. Espera unos segundos y reintenta."
+        in 500..599 -> "xAI presenta un problema temporal. Reintenta más tarde."
+        else -> "xAI respondió con HTTP $code."
     }
 }
