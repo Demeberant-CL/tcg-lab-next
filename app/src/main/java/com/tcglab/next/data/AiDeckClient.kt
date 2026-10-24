@@ -96,90 +96,100 @@ class AiDeckClient(context: Context) {
                 .put("name", "tcg_lab_deck")
                 .put("schema", cardSchema)
                 .put("strict", true))
+        // Keep the request on the smallest broadly compatible Responses API surface.
+        // Optional sampling/reasoning parameters are omitted because model support varies.
+        // If structured output is rejected, retry once without the text schema.
         val body = JSONObject()
             .put("model", currentModel())
             .put("input", prompt)
-            .put("temperature", 0.7)
-            .put("top_p", 0.95)
-            .put("reasoning_effort", "medium")
             .put("max_output_tokens", 4000)
             .put("text", textFormat)
-        val request = Request.Builder().url("https://api.x.ai/v1/responses")
-            .addHeader("Authorization", "Bearer $key").addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody("application/json".toMediaType())).build()
+
+        fun execute(json: JSONObject) = http.newCall(
+            Request.Builder().url("https://api.x.ai/v1/responses")
+                .addHeader("Authorization", "Bearer \$key")
+                .addHeader("Content-Type", "application/json")
+                .post(json.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+        )
 
         try {
-            http.newCall(request).execute().use { response ->
-                val raw = response.body?.string().orEmpty()
-                if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(response.code)))
-                val root = JSONObject(raw)
-                val output = root.optString("output_text").ifBlank {
-                    val out = root.optJSONArray("output") ?: JSONArray()
-                    buildString {
-                        for (i in 0 until out.length()) {
-                            val content = out.optJSONObject(i)?.optJSONArray("content") ?: continue
-                            for (j in 0 until content.length()) append(content.optJSONObject(j)?.optString("text").orEmpty())
-                        }
-                    }
-                }.trim()
-                val jsonText = output
-                val json = JSONObject(jsonText)
-                val energiesJson = json.optJSONArray("energies") ?: JSONArray()
-                val energies = buildList { for (i in 0 until energiesJson.length()) add(energiesJson.getInt(i)) }.distinct()
-                if (energies.size !in 1..3 || energies.any { it !in 1..8 }) return@withContext Result.failure(IllegalStateException("La IA devolvió energías inválidas."))
-                val cardsJson = json.optJSONArray("cards")
-                    ?: return@withContext Result.failure(IllegalStateException("La IA no devolvió cartas."))
-                val merged = linkedMapOf<String, Triple<String, Int, Int>>()
-                for (i in 0 until cardsJson.length()) {
-                    val item = cardsJson.getJSONObject(i)
-                    val set = item.getString("set").trim()
-                    val number = item.getInt("number")
-                    val quantity = item.getInt("quantity")
-                    if (quantity !in 1..2) {
-                        return@withContext Result.failure(IllegalStateException("Cantidad inválida para $set#$number."))
-                    }
-                    val key = "$set#$number"
-                    val previous = merged[key]
-                    merged[key] = if (previous == null) {
-                        Triple(set, number, quantity)
-                    } else {
-                        Triple(previous.first, previous.second, previous.third + quantity)
-                    }
+            val response = execute(body)
+            val raw = response.body?.string().orEmpty()
+            val code = response.code
+            response.close()
+            if (code == 400 || code == 422) {
+                val fallbackBody = JSONObject(body.toString()).apply { remove("text") }
+                execute(fallbackBody).use {
+                    val fallbackRaw = it.body?.string().orEmpty()
+                    if (!it.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(it.code)))
+                    return@withContext parseProposal(fallbackRaw, holdings, catalog)
                 }
-
-                val ownedByKey = holdings
-                    .filter { it.quantity > 0 }
-                    .associateBy { "${it.setCode.uppercase()}#${it.number.toIntOrNull() ?: it.number}" }
-
-                val cards = mutableListOf<DeckCard>()
-                for ((key, entry) in merged) {
-                    val set = entry.first
-                    val number = entry.second
-                    val quantity = entry.third
-                    val cc = catalog.find { it.set.equals(set, true) && it.number == number }
-                        ?: return@withContext Result.failure(IllegalStateException("Carta inexistente: $key"))
-                    val ownedQty = ownedByKey["${cc.set.uppercase()}#$number"]?.quantity ?: 0
-                    if (quantity > ownedQty) {
-                        return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de ${cc.name} de las disponibles."))
-                    }
-                    cards += DeckCard(
-                        set,
-                        number.toString(),
-                        cc.name,
-                        if (cc.trainer) "Entrenadores" else "Pokémon",
-                        quantity,
-                        Catalog.imageUrl(cc),
-                        cc.entityId
-                    )
-                }
-                val deck = Deck(0L, json.optString("name").ifBlank { "Mazo IA" }, cards, energies)
-                if (!deck.isValid) return@withContext Result.failure(IllegalStateException("La IA devolvió un mazo que no cumple las 20 cartas."))
-                Result.success(AiDeckProposal(deck, json.optString("explanation").ifBlank { "Propuesta generada desde la colección." }))
             }
+            if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(code)))
+            return@withContext parseProposal(raw, holdings, catalog)
         } catch (_: java.net.SocketTimeoutException) {
             Result.failure(IllegalStateException("Tiempo de espera agotado. Puedes reintentar."))
         } catch (_: java.io.IOException) {
             Result.failure(IllegalStateException("No se pudo conectar con xAI. Comprueba tu conexión."))
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException(e.message ?: "Respuesta de IA no válida."))
+        }
+    }
+
+    private fun parseProposal(
+        raw: String,
+        holdings: List<CollectionCard>,
+        catalog: List<CatalogCard>
+    ): Result<AiDeckProposal> {
+        return try {
+            val root = JSONObject(raw)
+            val output = root.optString("output_text").ifBlank {
+                val out = root.optJSONArray("output") ?: JSONArray()
+                buildString {
+                    for (i in 0 until out.length()) {
+                        val content = out.optJSONObject(i)?.optJSONArray("content") ?: continue
+                        for (j in 0 until content.length()) append(content.optJSONObject(j)?.optString("text").orEmpty())
+                    }
+                }
+            }.trim()
+            if (output.isBlank()) return Result.failure(IllegalStateException("La IA no devolvió contenido utilizable."))
+            val jsonText = output.removePrefix("\`\`\`json").removePrefix("\`\`\`").removeSuffix("\`\`\`").trim()
+            val json = JSONObject(jsonText)
+            val energiesJson = json.optJSONArray("energies") ?: JSONArray()
+            val energies = buildList { for (i in 0 until energiesJson.length()) add(energiesJson.getInt(i)) }.distinct()
+            if (energies.size !in 1..3 || energies.any { it !in 1..8 }) return Result.failure(IllegalStateException("La IA devolvió energías inválidas."))
+            val cardsJson = json.optJSONArray("cards") ?: return Result.failure(IllegalStateException("La IA no devolvió cartas."))
+            val merged = linkedMapOf<String, Triple<String, Int, Int>>()
+            for (i in 0 until cardsJson.length()) {
+                val item = cardsJson.getJSONObject(i)
+                val set = item.getString("set").trim()
+                val number = item.getInt("number")
+                val quantity = item.getInt("quantity")
+                if (quantity !in 1..2) return Result.failure(IllegalStateException("Cantidad inválida para \$set#\$number."))
+                val key = "\${set.uppercase()}#\$number"
+                val previous = merged[key]
+                merged[key] = if (previous == null) Triple(set, number, quantity) else Triple(previous.first, previous.second, previous.third + quantity)
+            }
+            val ownedByKey = holdings.filter { it.quantity > 0 }
+                .associateBy { "\${it.setCode.uppercase()}#\${it.number.toIntOrNull() ?: it.number}" }
+            val cards = mutableListOf<DeckCard>()
+            for ((key, entry) in merged) {
+                val set = entry.first
+                val number = entry.second
+                val quantity = entry.third
+                if (quantity > 2) return Result.failure(IllegalStateException("La propuesta supera 2 copias de \$key."))
+                val cc = catalog.find { it.set.equals(set, true) && it.number == number }
+                    ?: return Result.failure(IllegalStateException("Carta inexistente: \$key"))
+                val ownedQty = ownedByKey["\${cc.set.uppercase()}#\$number"]?.quantity ?: 0
+                if (quantity > ownedQty) return Result.failure(IllegalStateException("La propuesta usa más copias de \${cc.name} de las disponibles."))
+                cards += DeckCard(set, number.toString(), cc.name, if (cc.trainer) "Entrenadores" else "Pokémon", quantity, Catalog.imageUrl(cc), cc.entityId)
+            }
+            val deck = Deck(0L, json.optString("name").ifBlank { "Mazo IA" }, cards, energies)
+            if (!deck.isValid) return Result.failure(IllegalStateException("La IA devolvió un mazo que no cumple las reglas."))
+            Result.success(AiDeckProposal(deck, json.optString("explanation").ifBlank { "Propuesta generada desde la colección." }))
+        } catch (_: org.json.JSONException) {
+            Result.failure(IllegalStateException("La respuesta de IA no contiene JSON válido. Reintenta."))
         } catch (e: Exception) {
             Result.failure(IllegalStateException(e.message ?: "Respuesta de IA no válida."))
         }
