@@ -25,6 +25,7 @@ import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
 import com.tcglab.next.data.DeckSummary
+import com.tcglab.next.data.AiDeckClient
 import com.tcglab.next.data.TcgDatabase
 
 private val Background = Color(0xFF080C13)
@@ -39,13 +40,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Catalog.load(this)
         database = TcgDatabase(this)
-        setContent { TcgLabNextApp(database) }
+        setContent { TcgLabNextApp(database, AiDeckClient(this)) }
     }
     override fun onDestroy() { database.close(); super.onDestroy() }
 }
 
 @Composable
-private fun TcgLabNextApp(database: TcgDatabase) {
+private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by remember { mutableIntStateOf(0) }
     val cards = remember { mutableStateOf(database.getCards()) }
     val decks = remember { mutableStateOf(database.getDecks()) }
@@ -61,7 +62,7 @@ private fun TcgLabNextApp(database: TcgDatabase) {
                 0 -> HomeScreen(Modifier.padding(padding), cards.value.sumOf { it.quantity }, decks.value.size) { selected = 3 }
                 1 -> CollectionScreen(Modifier.padding(padding), Catalog.allCards(), cards.value, database) { cards.value = database.getCards() }
                 2 -> DecksScreen(Modifier.padding(padding), decks.value) { decks.value = database.getDecks() }
-                else -> StrategyScreen(Modifier.padding(padding))
+                else -> StrategyScreen(Modifier.padding(padding), cards.value, database, aiClient) { decks.value = database.getDecks() }
             }
         }
     }
@@ -164,14 +165,63 @@ private fun TcgLabNextApp(database: TcgDatabase) {
     }
 }
 
-@Composable private fun StrategyScreen(modifier: Modifier) {
+@Composable
+private fun StrategyScreen(
+    modifier: Modifier,
+    holdings: List<CollectionCard>,
+    database: TcgDatabase,
+    aiClient: AiDeckClient,
+    onDeckSaved: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var key by remember { mutableStateOf("") }
+    var goal by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var explanation by remember { mutableStateOf<String?>(null) }
+
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Estrategia IA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Card(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(Surface)) {
-            Column(Modifier.padding(20.dp)) {
-                Text("Análisis estratégico", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp)); Text("La IA revisará la colección y propondrá un mazo válido de 20 cartas.", color = Muted)
-                Spacer(Modifier.height(18.dp)); Button({}) { Icon(Icons.Outlined.AutoAwesome, null); Spacer(Modifier.width(8.dp)); Text("Comenzar análisis") }
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Constructor estratégico", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Grok analiza únicamente las cartas registradas y propone un mazo válido de 20 cartas.", color = Muted)
+                if (!aiClient.hasKey()) {
+                    OutlinedTextField(value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Clave API de xAI") }, placeholder = { Text("xai-...") }, singleLine = true)
+                    Text("La clave se guarda solo en este dispositivo y no se incluye en el proyecto.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedTextField(value = goal, onValueChange = { goal = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Objetivo (opcional)") }, placeholder = { Text("Ej.: priorizar consistencia y bajo coste") }, minLines = 2)
+                Button(
+                    enabled = !busy && holdings.sumOf { it.quantity } > 0,
+                    onClick = {
+                        if (!aiClient.hasKey()) aiClient.saveKey(key)
+                        busy = true
+                        message = null
+                        explanation = null
+                        scope.launch {
+                            aiClient.generate(holdings, com.tcglab.next.data.Catalog.allCards(), goal)
+                                .onSuccess {
+                                    database.saveDeck(it.deck)
+                                    explanation = it.explanation
+                                    message = "Mazo guardado automáticamente: ${it.deck.name}"
+                                    onDeckSaved()
+                                }
+                                .onFailure { message = it.message ?: "No se pudo generar el mazo." }
+                            busy = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Outlined.AutoAwesome, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (busy) "Analizando colección..." else "Generar y guardar mazo")
+                }
+                message?.let { Text(it, color = if (it.startsWith("Mazo")) Accent else Muted, fontWeight = FontWeight.SemiBold) }
+                explanation?.let {
+                    HorizontalDivider()
+                    Text("Criterio de la IA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(it, color = Muted)
+                }
             }
         }
     }
