@@ -913,6 +913,19 @@ private fun SettingsScreen(
                 message = "Clave eliminada"
             }) { Text("Borrar") }
         }
+        OutlinedButton(
+            onClick = {
+                scope.launch {
+                    message = "Probando clave..."
+                    val result = aiClient.testConnection()
+                    message = result.fold(
+                        onSuccess = { models -> "Conexión correcta · ${models.size} modelos disponibles." },
+                        onFailure = { it.message ?: "No se pudo validar la clave." }
+                    )
+                }
+            },
+            enabled = aiClient.hasKey()
+        ) { Text("Probar clave") }
         message?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
         Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
