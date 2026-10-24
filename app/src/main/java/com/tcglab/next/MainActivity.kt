@@ -53,7 +53,18 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selectedDeckId by remember { mutableStateOf<Long?>(null) }
     val cards = remember { mutableStateOf(database.getCards()) }
     val decks = remember { mutableStateOf(database.getDecks()) }
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent, background = Background, surface = Surface)) {
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = Accent,
+            onPrimary = Color.White,
+            background = Background,
+            onBackground = Color.White,
+            surface = Surface,
+            onSurface = Color.White,
+            surfaceVariant = Surface2,
+            onSurfaceVariant = Muted
+        )
+    ) {
         Scaffold(containerColor = Background, bottomBar = {
             NavigationBar(containerColor = Surface) {
                 listOf("Inicio" to Icons.Outlined.Home, "Colección" to Icons.Outlined.CollectionsBookmark, "Mazos" to Icons.Outlined.GridView, "Estrategia" to Icons.Outlined.AutoAwesome).forEachIndexed { i, item ->
@@ -123,7 +134,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 FilterChip(filter == option, { filter = option }, { Text(option) })
             }
         }
-        LazyVerticalGrid(columns = GridCells.Fixed(2), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
+        LazyVerticalGrid(modifier = Modifier.weight(1f), columns = GridCells.Fixed(2), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
             items(visible, key = { "${it.set}#${it.number}" }) { card ->
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
@@ -155,7 +166,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
         if (decks.isEmpty()) {
             EmptyCard("Sin mazos", "Los mazos creados con IA aparecerán aquí.")
         } else {
-            androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(decks, key = { it.id }) { deck ->
                     Card(onClick = { onOpen(deck.id) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
