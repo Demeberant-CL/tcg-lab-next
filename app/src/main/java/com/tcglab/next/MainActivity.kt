@@ -127,7 +127,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
             items(visible, key = { "${it.set}#${it.number}" }) { card ->
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface), onClick = { onOpen(deck.id) }) {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
                     Column {
                         AsyncImage(model = Catalog.imageUrl(card), contentDescription = card.name, modifier = Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Fit)
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -157,7 +157,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
         } else {
             androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(decks, key = { it.id }) { deck ->
-                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface), onClick = { onOpen(deck.id) }) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Outlined.GridView, null, tint = Accent)
                             Spacer(Modifier.width(12.dp))
