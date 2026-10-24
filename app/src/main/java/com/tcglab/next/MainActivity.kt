@@ -63,6 +63,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by remember { mutableIntStateOf(0) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
     val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
     val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
@@ -149,7 +150,10 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                         onBack = { selectedDeck = null },
                         onDeleted = {
                             selectedDeck = null
-                            decks.value = emptyList()
+                            scope.launch(Dispatchers.IO) {
+                                val updated = database.getDecks()
+                                withContext(Dispatchers.Main) { decks.value = updated }
+                            }
                         }
                     )
                 } else {
@@ -157,8 +161,10 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                         Modifier.padding(padding),
                         decks.value,
                         onOpen = { id ->
-                            // Detail loading is triggered by the deck screen callback.
-                            selectedDeck = null
+                            scope.launch(Dispatchers.IO) {
+                                val deck = database.getDeck(id)
+                                withContext(Dispatchers.Main) { selectedDeck = deck }
+                            }
                         },
                         onStrategy = { selected = 3 }
                     )
@@ -337,17 +343,18 @@ private fun CollectionScreen(
     catalog: List<CatalogCard>,
     holdings: List<CollectionCard>,
     database: TcgDatabase,
-    onChanged: () -> Unit
+    onChanged: (List<CollectionCard>) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("Todas") }
+    val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
     val visible = remember(query, filter, catalog) {
         val q = query.trim()
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            .take(if (q.isBlank()) 24 else 40)
+            .take(80)
             .toList()
     }
     Column(
@@ -416,14 +423,20 @@ private fun CollectionScreen(
                                     ) {
                                         IconButton(onClick = {
                                             if (quantity > 0) {
-                                                database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
-                                                onChanged()
+                                                scope.launch(Dispatchers.IO) {
+                                                    database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                    val updated = database.getCards()
+                                                    withContext(Dispatchers.Main) { onChanged(updated) }
+                                                }
                                             }
                                         }) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
                                         Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) AccentSoft else Muted, style = MaterialTheme.typography.labelMedium)
                                         IconButton(onClick = {
-                                            database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
-                                            onChanged()
+                                            scope.launch(Dispatchers.IO) {
+                                                database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                val updated = database.getCards()
+                                                withContext(Dispatchers.Main) { onChanged(updated) }
+                                            }
                                         }) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
                                     }
                                 }
@@ -529,7 +542,7 @@ private fun StrategyScreen(
                     }
                     OutlinedTextField(value = goal, onValueChange = { goal = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Objetivo opcional") }, placeholder = { Text("Ej.: consistencia, agresividad, control...") }, minLines = 2, shape = RoundedCornerShape(14.dp))
                     Button(
-                        enabled = !busy && holdings.sumOf { it.quantity } > 0,
+                        enabled = !busy && holdings.distinctBy { it.key }.size >= 10,
                         onClick = {
                             if (!aiClient.hasKey()) aiClient.saveKey(key)
                             busy = true
