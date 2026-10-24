@@ -876,6 +876,7 @@ private fun SettingsScreen(
 ) {
     var key by remember { mutableStateOf(aiClient.currentKey() ?: "") }
     var message by remember { mutableStateOf<String?>(null) }
+    var showKey by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -890,7 +891,16 @@ private fun SettingsScreen(
             onValueChange = { key = it },
             label = { Text("xai-...") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showKey = !showKey }) {
+                    Icon(
+                        if (showKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        if (showKey) "Ocultar clave" else "Mostrar clave"
+                    )
+                }
+            }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
