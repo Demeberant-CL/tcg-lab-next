@@ -15,7 +15,7 @@ data class AiDeckProposal(val deck: Deck, val explanation: String)
 
 class AiDeckClient(context: Context) {
     private val prefs = context.getSharedPreferences("tcg_lab_ai", Context.MODE_PRIVATE)
-    private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS).build()
+    private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(180, TimeUnit.SECONDS).build()
     fun hasKey(): Boolean = prefs.getString("xai_key", "").orEmpty().isNotBlank()
     fun saveKey(key: String) { prefs.edit().putString("xai_key", key.trim()).apply() }
 
@@ -43,7 +43,40 @@ class AiDeckClient(context: Context) {
             ${owned.joinToString("\n")}
         """.trimIndent()
 
-        val body = JSONObject().put("model", "grok-4.7").put("input", prompt).put("temperature", 0.3).put("max_output_tokens", 4000)
+        val cardSchema = JSONObject()
+            .put("type", "object")
+            .put("properties", JSONObject()
+                .put("name", JSONObject().put("type", "string"))
+                .put("energies", JSONObject()
+                    .put("type", "array")
+                    .put("items", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 8)))
+                .put("cards", JSONObject()
+                    .put("type", "array")
+                    .put("items", JSONObject()
+                        .put("type", "object")
+                        .put("properties", JSONObject()
+                            .put("set", JSONObject().put("type", "string"))
+                            .put("number", JSONObject().put("type", "integer"))
+                            .put("quantity", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 2)))
+                        .put("required", JSONArray().put("set").put("number").put("quantity"))
+                        .put("additionalProperties", false)))
+                .put("explanation", JSONObject().put("type", "string")))
+            .put("required", JSONArray().put("name").put("energies").put("cards").put("explanation"))
+            .put("additionalProperties", false)
+        val textFormat = JSONObject()
+            .put("format", JSONObject()
+                .put("type", "json_schema")
+                .put("name", "tcg_lab_deck")
+                .put("schema", cardSchema)
+                .put("strict", true))
+        val body = JSONObject()
+            .put("model", "grok-4.7")
+            .put("input", prompt)
+            .put("temperature", 0.7)
+            .put("top_p", 0.95)
+            .put("reasoning_effort", "medium")
+            .put("max_output_tokens", 4000)
+            .put("text", textFormat)
         val request = Request.Builder().url("https://api.x.ai/v1/responses")
             .addHeader("Authorization", "Bearer $key").addHeader("Content-Type", "application/json")
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
@@ -62,7 +95,7 @@ class AiDeckClient(context: Context) {
                         }
                     }
                 }.trim()
-                val jsonText = output.substringAfter("{").let { "{" + it.substringBeforeLast("}") + "}" }
+                val jsonText = output
                 val json = JSONObject(jsonText)
                 val energiesJson = json.optJSONArray("energies") ?: JSONArray()
                 val energies = buildList { for (i in 0 until energiesJson.length()) add(energiesJson.getInt(i)) }.distinct()
