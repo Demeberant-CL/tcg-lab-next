@@ -20,9 +20,9 @@ import com.tcglab.next.data.DeckQr
 import com.tcglab.next.data.TcgDatabase
 import androidx.compose.ui.graphics.Color
 
-private val DetailSurface = Color(0xFF111823)
+private val DetailDetailSurface = Color(0xFF111823)
 private val DetailAccent = Color(0xFF58A6FF)
-private val DetailMuted = Color(0xFF8E9AAA)
+private val DetailDetailMuted = Color(0xFF8E9AAA)
 
 @Composable
 fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDeleted: () -> Unit) {
@@ -34,16 +34,16 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
             IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Volver") }
             Column(Modifier.weight(1f)) {
                 Text(deck.name, style = MaterialTheme.typography.headlineSmall)
-                Text("${deck.totalCards}/20 cartas · ${deck.energies.size} energías", color = DetailMuted)
+                Text("${deck.totalCards}/20 cartas · ${deck.energies.size} energías", color = DetailDetailMuted)
             }
-            Text(if (deck.isValid) "VÁLIDO" else "REVISAR", color = if (deck.isValid) DetailAccent else DetailMuted)
+            Text(if (deck.isValid) "VÁLIDO" else "REVISAR", color = if (deck.isValid) DetailAccent else DetailDetailMuted)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = { showQr = !showQr }) { Text(if (showQr) "Ocultar QR" else "Mostrar QR") }
             OutlinedButton(onClick = { confirmDelete = true }) { Icon(Icons.Outlined.Delete, null); Spacer(Modifier.width(6.dp)); Text("Eliminar") }
         }
         if (showQr) {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(DetailSurface)) {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(DetailDetailSurface)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(qr.asImageBitmap(), contentDescription = "QR del mazo", modifier = Modifier.size(280.dp))
                     Text("Código del mazo", style = MaterialTheme.typography.titleMedium)
@@ -54,11 +54,11 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
             item { Text("Energías: ${deck.energies.joinToString(" · ")}", style = MaterialTheme.typography.titleMedium) }
             item { Text("Cartas", style = MaterialTheme.typography.titleMedium) }
             items(deck.cards, key = { "${it.setCode}#${it.number}" }) { card ->
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(Surface)) {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(DetailSurface)) {
                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(model = card.imageUrl, contentDescription = card.name, modifier = Modifier.size(58.dp))
                         Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) { Text(card.name); Text("${card.setCode} · ${card.number} · ${card.category}", color = Muted, style = MaterialTheme.typography.labelSmall) }
+                        Column(Modifier.weight(1f)) { Text(card.name); Text("${card.setCode} · ${card.number} · ${card.category}", color = DetailMuted, style = MaterialTheme.typography.labelSmall) }
                         Text("×${card.quantity}", style = MaterialTheme.typography.titleMedium)
                     }
                 }
