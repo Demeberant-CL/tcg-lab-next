@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.tcglab.next.data.AiDeckClient
+import com.tcglab.next.data.AiDeckProposal
 import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
@@ -535,6 +536,7 @@ private fun StrategyScreen(
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var explanation by remember { mutableStateOf<String?>(null) }
+    var proposal by remember { mutableStateOf<AiDeckProposal?>(null) }
     var showKey by remember { mutableStateOf(false) }
     val distinctHoldings = holdings.distinctBy { it.key }.size
 
@@ -606,15 +608,15 @@ private fun StrategyScreen(
                             busy = true
                             message = null
                             explanation = null
+                            proposal = null
                             scope.launch {
                                 aiClient.generate(holdings, Catalog.allCards(), goal)
                                     .onSuccess {
-                                        withContext(Dispatchers.IO) { database.saveDeck(it.deck) }
+                                        proposal = it
                                         explanation = it.explanation
-                                        message = "Mazo guardado: ${it.deck.name}"
-                                        onDeckSaved(withContext(Dispatchers.IO) { database.getDecks() })
+                                        message = "Propuesta lista para revisar."
                                     }
-                                    .onFailure { message = it.message ?: "No se pudo generar el mazo." }
+                                    .onFailure { message = it.message ?: "No se pudo generar la propuesta." }
                                 busy = false
                             }
                         },
@@ -623,7 +625,35 @@ private fun StrategyScreen(
                     ) {
                         Icon(Icons.Outlined.AutoAwesome, null)
                         Spacer(Modifier.width(8.dp))
-                        Text(if (busy) "Analizando colección..." else "Generar y guardar mazo", fontWeight = FontWeight.Bold)
+                        Text(if (busy) "Analizando colección..." else "Generar propuesta", fontWeight = FontWeight.Bold)
+                    }
+                    proposal?.let { p ->
+                        HorizontalDivider(color = Divider)
+                        Text("Propuesta", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AssistChip(onClick = {}, label = { Text("${p.deck.totalCards}/20 cartas") })
+                            AssistChip(onClick = {}, label = { Text("${p.deck.energies.size} energías") })
+                            AssistChip(onClick = {}, label = { Text(if (p.deck.isValid) "Válido" else "Revisar") })
+                        }
+                        Text(p.deck.name, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Energías: ${p.deck.energies.joinToString(" · ")}", color = AccentSoft)
+                        Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = Muted)
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { database.saveDeck(p.deck) }
+                                    message = "Mazo guardado: ${p.deck.name}"
+                                    onDeckSaved(withContext(Dispatchers.IO) { database.getDecks() })
+                                    proposal = null
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Outlined.Save, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Guardar mazo")
+                        }
                     }
                     message?.let { Text(it, color = if (it.startsWith("Mazo")) AccentSoft else Color(0xFFFFB86B), fontWeight = FontWeight.SemiBold) }
                     explanation?.let {
