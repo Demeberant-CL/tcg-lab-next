@@ -1,0 +1,7 @@
+{
+  "name": "TCG LAB",
+  "description": "Laboratorio de estrategia y constructor de mazos para Pokémon TCG Pocket con análisis de colección, exportación QR y soporte de IA.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,42 +1,27 @@
 # TCG LAB NEXT
 
-App Android (Kotlin + Jetpack Compose + SQLite) para gestionar colección y mazos de **Pokémon TCG Pocket**, con propuesta de mazos por IA (xAI/Grok).
+Aplicación web React + TypeScript + Tailwind CSS para gestionar tu colección y mazos de **Pokémon TCG Pocket**, con análisis y propuesta de mazos por IA (Grok / motor táctico TCG LAB).
 
-## Funciones actuales
+## Funciones
 
-- Colección completa (4.317+ cartas) con búsqueda, filtros (Tengo / Me faltan / set) y progreso por set
-- Registro de cantidades con updates atómicos
-- Lista de deseados (wishlist)
-- Constructor manual de mazos (máx. 2 copias por nombre, 1–3 energías, 20 cartas)
-- Generación de mazos con IA (clave y modelo configurables)
-- Exportar / importar colección en JSON
-- Tema oscuro y claro
-- QR de mazos
+- **Colección completa (4.300+ cartas)**: búsqueda instantánea por nombre o ID, filtros por categoría (Pokémon / Entrenadores), estado de posesión (Tengo / Me faltan), carrusel de expansiones/sets y cálculo de progreso.
+- **Registro rápido de copias**: botones de suma y resta con actualización inmediata en almacenamiento local.
+- **Lista de deseados (Wishlist)**: marca cartas deseadas y filtra la colección con un toque.
+- **Constructor de mazos**: validación de reglas de Pokémon TCG Pocket (exactamente 20 cartas, máx. 2 copias por nombre, 1–3 energías).
+- **Generación de mazos con IA**: análisis de colección basado en cartas registradas mediante xAI Grok (o el motor táctico integrado) con justificación estratégica.
+- **Exportación e Importación**: exporta tu colección en JSON para respaldos o impórtala (modos sumar o reemplazar).
+- **Códigos QR de mazos**: genera un código QR para compartir y guardar tus configuraciones de mazo.
+- **Temas**: soporte para tema oscuro y claro.
 
-## Compilar
+## Ejecución
 
 ```bash
-./gradlew assembleDebug
+npm install
+npm run dev
 ```
 
-El APK queda en `app/build/outputs/apk/debug/`.
-
-## Configuración de IA
-
-1. Obtén una clave en [console.x.ai](https://console.x.ai)
-2. En la app: Inicio → engranaje → pega la clave (`xai-...`) y el modelo deseado
-3. La clave se guarda localmente y solo se envía a xAI al generar un mazo
-
-## Exportar / importar
-
-En Ajustes puedes exportar tu colección como JSON y pegarlo para importar (modo sumar o reemplazar).
+El servidor de desarrollo se inicia en `http://localhost:3000`.
 
 ## Aviso legal
 
-App fan **no oficial**.  
-Pokémon, Pokémon TCG Pocket y las marcas asociadas son propiedad de Nintendo / Creatures / GAME FREAK.  
-Las imágenes de cartas provienen de fuentes de terceros. Esta app no está afiliada ni respaldada por The Pokémon Company.
-
-## Privacidad
-
-Todos los datos de colección y mazos se guardan localmente. Solo la generación de mazos por IA envía la lista de cartas a xAI usando la clave del usuario.
+App fan **no oficial**. Pokémon, Pokémon TCG Pocket y las marcas asociadas son propiedad de Nintendo / Creatures / GAME FREAK.
