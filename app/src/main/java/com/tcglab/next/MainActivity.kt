@@ -383,25 +383,33 @@ private fun CollectionScreen(
     database: TcgDatabase,
     onChanged: (List<CollectionCard>) -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("Todas") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("Todas") }
+    var ownership by rememberSaveable { mutableStateOf("Todas") }
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
-    val visible = remember(query, filter, catalog) {
+    val ownedKeys = remember(holdings) { holdings.map { it.key }.toSet() }
+    val visible = remember(query, filter, ownership, catalog, ownedKeys) {
         val q = query.trim()
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
-            .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            
+            .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) || "${it.set}-${it.number}".contains(q, ignoreCase = true) }
+            .filter {
+                val key = "${it.set}#${it.number}"
+                ownership == "Todas" || (ownership == "Tengo" && key in ownedKeys) || (ownership == "Me faltan" && key !in ownedKeys)
+            }
             .toList()
     }
+    val uniqueOwned = holdings.distinctBy { it.key }.size
+    val progress = if (catalog.isNotEmpty()) uniqueOwned.toFloat() / catalog.size else 0f
     Column(
         modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Colección", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("${holdings.sumOf { it.quantity }} cartas registradas · ${catalog.size} disponibles", color = Muted)
+        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${catalog.size} únicas", color = Muted)
+        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = Accent)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -414,6 +422,11 @@ private fun CollectionScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Todas", "Pokémon", "Entrenadores").forEach { option ->
                 FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option) })
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Todas", "Tengo", "Me faltan").forEach { option ->
+                FilterChip(selected = ownership == option, onClick = { ownership = option }, label = { Text(option) })
             }
         }
         LazyColumn(
