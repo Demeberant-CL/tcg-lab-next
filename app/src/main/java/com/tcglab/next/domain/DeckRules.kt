@@ -1,6 +1,6 @@
 package com.tcglab.next.domain
 
-import com.tcglab.next.data.DeckCard
+import com.tcglab.next.data.Deck\nimport com.tcglab.next.data.DeckCard
 import java.text.Normalizer
 import java.util.Locale
 
@@ -10,7 +10,7 @@ object DeckRules {
     const val MAX_COPIES_PER_NAME = 2
     const val DECK_SIZE = 20
 
-    fun normalizeName(name: String): String =
+    fun normalize(name: String): String = normalizeName(name)\n\n    fun normalizeName(name: String): String =
         Normalizer.normalize(name.trim().lowercase(Locale.ROOT), Normalizer.Form.NFD)
             .replace("\\p{M}+".toRegex(), "")
             .replace("\\s+".toRegex(), " ")
