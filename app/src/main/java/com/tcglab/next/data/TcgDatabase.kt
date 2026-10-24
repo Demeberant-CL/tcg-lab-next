@@ -290,4 +290,23 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
         return imported
     }
 
+
+    fun getWishlist(): Set<String> {
+        val keys = mutableSetOf<String>()
+        readableDatabase.rawQuery("SELECT key FROM wishlist", null).use { c ->
+            while (c.moveToNext()) keys.add(c.getString(0))
+        }
+        return keys
+    }
+
+    fun toggleWishlist(key: String) {
+        val db = writableDatabase
+        val exists = db.rawQuery("SELECT 1 FROM wishlist WHERE key = ?", arrayOf(key)).use { it.moveToFirst() }
+        if (exists) {
+            db.delete("wishlist", "key = ?", arrayOf(key))
+        } else {
+            db.execSQL("INSERT OR IGNORE INTO wishlist(key) VALUES(?)", arrayOf(key))
+        }
+    }
+
 }
