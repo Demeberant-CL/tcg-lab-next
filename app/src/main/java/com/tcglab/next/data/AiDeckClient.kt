@@ -27,7 +27,7 @@ class AiDeckClient(context: Context) {
         val key = currentKey() ?: return@withContext Result.failure(IllegalStateException("Configura primero una clave de xAI."))
         try {
             val request = Request.Builder().url("https://api.x.ai/v1/models")
-                .addHeader("Authorization", "Bearer $key").get().build()
+                .addHeader("Authorization", "Bearer $key")
             http.newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(response.code)))
@@ -165,23 +165,23 @@ class AiDeckClient(context: Context) {
                 val set = item.getString("set").trim()
                 val number = item.getInt("number")
                 val quantity = item.getInt("quantity")
-                if (quantity !in 1..2) return Result.failure(IllegalStateException("Cantidad inválida para \$set#\$number."))
-                val key = "\${set.uppercase()}#\$number"
+                if (quantity !in 1..2) return Result.failure(IllegalStateException("Cantidad inválida para $set#$number."))
+                val key = "${set.uppercase()}#$number"
                 val previous = merged[key]
                 merged[key] = if (previous == null) Triple(set, number, quantity) else Triple(previous.first, previous.second, previous.third + quantity)
             }
             val ownedByKey = holdings.filter { it.quantity > 0 }
-                .associateBy { "\${it.setCode.uppercase()}#\${it.number.toIntOrNull() ?: it.number}" }
+                .associateBy { "${it.setCode.uppercase()}#${it.number.toIntOrNull() ?: it.number}" }
             val cards = mutableListOf<DeckCard>()
             for ((key, entry) in merged) {
                 val set = entry.first
                 val number = entry.second
                 val quantity = entry.third
-                if (quantity > 2) return Result.failure(IllegalStateException("La propuesta supera 2 copias de \$key."))
+                if (quantity > 2) return Result.failure(IllegalStateException("La propuesta supera 2 copias de $key."))
                 val cc = catalog.find { it.set.equals(set, true) && it.number == number }
-                    ?: return Result.failure(IllegalStateException("Carta inexistente: \$key"))
-                val ownedQty = ownedByKey["\${cc.set.uppercase()}#\$number"]?.quantity ?: 0
-                if (quantity > ownedQty) return Result.failure(IllegalStateException("La propuesta usa más copias de \${cc.name} de las disponibles."))
+                    ?: return Result.failure(IllegalStateException("Carta inexistente: $key"))
+                val ownedQty = ownedByKey["${cc.set.uppercase()}#$number"]?.quantity ?: 0
+                if (quantity > ownedQty) return Result.failure(IllegalStateException("La propuesta usa más copias de ${cc.name} de las disponibles."))
                 cards += DeckCard(set, number.toString(), cc.name, if (cc.trainer) "Entrenadores" else "Pokémon", quantity, Catalog.imageUrl(cc), cc.entityId)
             }
             val deck = Deck(0L, json.optString("name").ifBlank { "Mazo IA" }, cards, energies)
