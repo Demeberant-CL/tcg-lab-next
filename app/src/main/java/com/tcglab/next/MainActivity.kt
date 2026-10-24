@@ -3,6 +3,7 @@ package com.tcglab.next
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,7 +34,9 @@ import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
 import com.tcglab.next.data.DeckSummary
 import com.tcglab.next.data.TcgDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val Background = Color(0xFF070B12)
 private val Surface = Color(0xFF101722)
@@ -48,7 +51,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var database: TcgDatabase
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Catalog.load(this)
         database = TcgDatabase(this)
         setContent { TcgLabNextApp(database, AiDeckClient(this)) }
     }
@@ -59,8 +61,24 @@ class MainActivity : ComponentActivity() {
 private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by remember { mutableIntStateOf(0) }
     var selectedDeckId by remember { mutableStateOf<Long?>(null) }
-    val cards = remember { mutableStateOf(database.getCards()) }
-    val decks = remember { mutableStateOf(database.getDecks()) }
+    val context = LocalContext.current
+    val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
+    val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
+    val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
+    var loading by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            Catalog.load(context)
+            val loadedCards = database.getCards()
+            val loadedDecks = database.getDecks()
+            withContext(Dispatchers.Main) {
+                cards.value = loadedCards
+                decks.value = loadedDecks
+                catalog.value = Catalog.allCards()
+                loading = false
+            }
+        }
+    }
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -119,7 +137,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 )
                 1 -> CollectionScreen(
                     Modifier.padding(padding),
-                    Catalog.allCards(),
+                    catalog.value,
                     cards.value,
                     database
                 ) { cards.value = database.getCards() }
@@ -283,6 +301,8 @@ private fun HomeScreen(
                         Text("Registra cartas o crea un mazo con IA para comenzar.", color = Muted)
                     }
                 }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
             }
         }
     }
@@ -327,7 +347,7 @@ private fun CollectionScreen(
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            .take(80)
+            .take(if (q.isBlank()) 24 else 40)
             .toList()
     }
     Column(
@@ -354,14 +374,14 @@ private fun CollectionScreen(
                 )
             }
         }
-        LazyVerticalGrid(
+        LazyColumn(
             modifier = Modifier.weight(1f),
-            columns = GridCells.Fixed(2),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(visible, key = { "${it.set}:${it.number}:${it.entityId}" }) { card ->
+            items(visible.chunked(2), key = { row -> row.joinToString("|") { "${it.set}:${it.number}:${it.entityId}" } }) { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { card ->
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
                 Card(
