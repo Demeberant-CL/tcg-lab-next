@@ -55,7 +55,9 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
                 quantity INTEGER NOT NULL,
                 image_url TEXT NOT NULL,
                 category TEXT NOT NULL
-            );
+            )
+        """.trimIndent())
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS wishlist (
                 key TEXT PRIMARY KEY NOT NULL
             )
@@ -70,7 +72,9 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createDeckTables(db)
-        // v3: entityId rule removed; no schema change required for that
+        if (oldVersion < 3) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS wishlist (key TEXT PRIMARY KEY NOT NULL)")
+        }
     }
 
     private fun createDeckTables(db: SQLiteDatabase) {
