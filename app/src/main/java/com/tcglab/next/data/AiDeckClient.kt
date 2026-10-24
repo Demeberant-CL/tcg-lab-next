@@ -40,8 +40,7 @@ class AiDeckClient(context: Context) {
             cards debe sumar exactamente 20.
             Objetivo: $userGoal
             Cartas disponibles:
-            ${owned.joinToString("
-")}
+            ${owned.joinToString("\n")}
         """.trimIndent()
 
         val body = JSONObject().put("model", "grok-4.7").put("input", prompt).put("temperature", 0.3).put("max_output_tokens", 4000)
