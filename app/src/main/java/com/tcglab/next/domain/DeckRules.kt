@@ -1,6 +1,7 @@
 package com.tcglab.next.domain
 
-import com.tcglab.next.data.Deck\nimport com.tcglab.next.data.DeckCard
+import com.tcglab.next.data.Deck
+import com.tcglab.next.data.DeckCard
 import java.text.Normalizer
 import java.util.Locale
 
@@ -10,7 +11,9 @@ object DeckRules {
     const val MAX_COPIES_PER_NAME = 2
     const val DECK_SIZE = 20
 
-    fun normalize(name: String): String = normalizeName(name)\n\n    fun normalizeName(name: String): String =
+    fun normalize(name: String): String = normalizeName(name)
+
+    fun normalizeName(name: String): String =
         Normalizer.normalize(name.trim().lowercase(Locale.ROOT), Normalizer.Form.NFD)
             .replace("\\p{M}+".toRegex(), "")
             .replace("\\s+".toRegex(), " ")
@@ -24,11 +27,17 @@ object DeckRules {
         if (energies.size !in MIN_ENERGIES..MAX_ENERGIES) errors += "El mazo debe usar entre 1 y 3 energías distintas."
         if (energies.distinct().size != energies.size || energies.any { it !in 1..8 }) errors += "Las energías deben ser distintas y estar entre 1 y 8."
         if (basicCardNames.isNotEmpty()) {
-            val hasBasic = cards.any { !it.category.equals("Entrenadores", true) && basicCardNames.contains(normalizeName(it.name)) && it.quantity > 0 }
+            val hasBasic = cards.any {
+                !it.category.equals("Entrenadores", ignoreCase = true) &&
+                    basicCardNames.contains(normalizeName(it.name)) &&
+                    it.quantity > 0
+            }
             if (!hasBasic) errors += "El mazo debe contener al menos 1 Pokémon Básico."
         }
         return errors.distinct()
     }
+
+    fun isValid(deck: Deck): Boolean = isValid(deck.cards, deck.energies)
 
     fun isValid(cards: List<DeckCard>, energies: List<Int>, basicCardNames: Set<String> = emptySet()): Boolean =
         validate(cards, energies, basicCardNames).isEmpty()
