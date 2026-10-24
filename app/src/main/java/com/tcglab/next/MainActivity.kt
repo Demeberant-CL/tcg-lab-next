@@ -387,13 +387,23 @@ private fun CollectionScreen(
     var setFilter by rememberSaveable { mutableStateOf("Todos") }
     var showWishlistOnly by rememberSaveable { mutableStateOf(false) }
     var wishlist by remember { mutableStateOf(emptySet<String>()) }
+    var wishlistError by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     var localHoldings by remember(holdings) { mutableStateOf(holdings) }
     val holdingByKey = remember(localHoldings) { localHoldings.associateBy { it.key } }
     val quantityMutex = remember { Mutex() }
     var quantityError by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { wishlist = withContext(Dispatchers.IO) { database.getWishlist() } }
+    LaunchedEffect(Unit) {
+        runCatching { withContext(Dispatchers.IO) { database.getWishlist() } }
+            .onSuccess {
+                wishlist = it
+                wishlistError = null
+            }
+            .onFailure {
+                wishlistError = "No se pudo cargar la lista de deseadas."
+            }
+    }
     val ownedKeys = remember(holdings) { localHoldings.map { it.key }.toSet() }
     val visible = remember(query, filter, ownership, setFilter, showWishlistOnly, catalog, ownedKeys, wishlist) {
         val q = query.trim()
@@ -462,6 +472,9 @@ private fun CollectionScreen(
             onClick = { showWishlistOnly = !showWishlistOnly },
             label = { Text(if (showWishlistOnly) "Solo deseadas" else "Mostrar deseadas") }
         )
+        wishlistError?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
         quantityError?.let { error ->
             Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -613,10 +626,18 @@ private fun CollectionScreen(
                     val key = "${card.set}#${card.number}"
                     val wished = key in wishlist
                     TextButton(onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            database.toggleWishlist(key)
-                            val updated = database.getWishlist()
-                            withContext(Dispatchers.Main) { wishlist = updated }
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    database.toggleWishlist(key)
+                                    database.getWishlist()
+                                }
+                            }.onSuccess {
+                                wishlist = it
+                                wishlistError = null
+                            }.onFailure {
+                                wishlistError = "No se pudo actualizar la lista de deseadas."
+                            }
                         }
                     }) {
                         Text(if (wished) "Quitar de deseados" else "Añadir a deseados")
