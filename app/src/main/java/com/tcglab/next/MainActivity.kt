@@ -48,25 +48,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Background = Color(0xFF070B12)
-private val Surface = Color(0xFF101722)
-private val SurfaceRaised = Color(0xFF162335)
-private val SurfaceBlue = Color(0xFF142B45)
-private val Accent = Color(0xFF62A9FF)
-private val AccentSoft = Color(0xFF9CC9FF)
-private val Muted = Color(0xFF9BA8B8)
-private val Divider = Color(0xFF263446)
-
 class MainActivity : ComponentActivity() {
     private val database: TcgDatabase get() = DatabaseHolder.db
+    private val aiClient by lazy { AiDeckClient(applicationContext) }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseHolder.init(applicationContext)
         enableEdgeToEdge()
         setContent {
-            val ai = AiDeckClient(this)
-            TcgLabTheme(darkTheme = ai.isDarkTheme()) {
-                TcgLabNextApp(database, ai)
+            TcgLabTheme(darkTheme = aiClient.isDarkTheme()) {
+                TcgLabNextApp(database, aiClient)
             }
         }
     }
@@ -108,29 +99,10 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
         }
     }
 
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = Accent,
-            onPrimary = Color.White,
-            secondary = AccentSoft,
-            background = Background,
-            onBackground = Color.White,
-            surface = Surface,
-            onSurface = Color.White,
-            surfaceVariant = SurfaceRaised,
-            onSurfaceVariant = Muted,
-            outline = Divider
-        ),
-        shapes = Shapes(
-            small = RoundedCornerShape(12.dp),
-            medium = RoundedCornerShape(18.dp),
-            large = RoundedCornerShape(26.dp)
-        )
-    ) {
-        Scaffold(
-            containerColor = Background,
+    Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                NavigationBar(containerColor = Color(0xFF0D131D), tonalElevation = 0.dp) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                     listOf(
                         "Inicio" to Icons.Outlined.Home,
                         "Colección" to Icons.Outlined.CollectionsBookmark,
@@ -143,11 +115,11 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                             icon = { Icon(item.second, item.first) },
                             label = { Text(item.first) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color.White,
-                                indicatorColor = Accent.copy(alpha = 0.20f),
-                                unselectedIconColor = Muted,
-                                unselectedTextColor = Muted
+                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     }
@@ -169,7 +141,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 )
             } else if (loading) {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Accent)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else when (selected) {
                 0 -> HomeScreen(
@@ -235,10 +207,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 ) { updated -> decks.value = updated }
             }
         }
-    }
-}
-
-@Composable
+  @Composable
 private fun HomeScreen(
     modifier: Modifier,
     cardCount: Int,
@@ -256,12 +225,12 @@ private fun HomeScreen(
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("TCG LAB", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                    Text("Laboratorio de estrategia", color = Muted, style = MaterialTheme.typography.bodyLarge)
+                    Text("TCG LAB", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                    Text("Laboratorio de estrategia", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 }
-                Surface(shape = RoundedCornerShape(16.dp), color = SurfaceRaised) {
+                MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                     IconButton(onClick = onSettings) {
-                        Icon(Icons.Outlined.Settings, "Ajustes", tint = AccentSoft)
+                        Icon(Icons.Outlined.Settings, "Ajustes", tint = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
@@ -270,7 +239,7 @@ private fun HomeScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceBlue)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Box(
                     Modifier
@@ -284,26 +253,26 @@ private fun HomeScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
+                            MaterialTheme.colorScheme.surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = Accent.copy(alpha = 0.15f)
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                             ) {
                                 Icon(
                                     Icons.Outlined.AutoAwesome,
                                     null,
-                                    tint = Accent,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(10.dp).size(24.dp)
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text("ESTRATEGIA IA", color = AccentSoft, fontWeight = FontWeight.Bold)
-                                Text("Laboratorio de decisiones", color = Muted, style = MaterialTheme.typography.labelMedium)
+                                Text("ESTRATEGIA IA", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                                Text("Laboratorio de decisiones", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                         Text(
                             "Construye tu próximo mazo",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -347,25 +316,25 @@ private fun HomeScreen(
         }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Actividad reciente", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("Laboratorio", color = Muted, style = MaterialTheme.typography.labelMedium)
+                Text("Actividad reciente", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("Laboratorio", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             }
         }
         item {
-            Surface(
+            MaterialTheme.colorScheme.surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                color = Surface
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(14.dp), color = SurfaceRaised) {
-                        Icon(Icons.Outlined.Insights, null, tint = Accent, modifier = Modifier.padding(11.dp).size(24.dp))
+                    MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Icon(Icons.Outlined.Insights, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(11.dp).size(24.dp))
                     }
                     Spacer(Modifier.width(14.dp))
                     Column {
-                        Text("Sin actividad todavía", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("Sin actividad todavía", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(3.dp))
-                        Text("Registra cartas o crea un mazo con IA para comenzar.", color = Muted)
+                        Text("Registra cartas o crea un mazo con IA para comenzar.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -385,13 +354,13 @@ private fun DashboardStat(
     Card(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Icon(icon, null, tint = Accent, modifier = Modifier.size(25.dp))
-            Text(title, color = Muted, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-            Text(value, color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Muted, style = MaterialTheme.typography.labelSmall)
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Text(value, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -435,9 +404,9 @@ private fun CollectionScreen(
         modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Colección", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${filteredCatalog.size} únicas${if (setFilter != "Todos") " ($setFilter)" else ""}", color = Muted)
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = Accent)
+        Text("Colección", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${filteredCatalog.size} únicas${if (setFilter != "Todos") " ($setFilter)" else ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -484,7 +453,7 @@ private fun CollectionScreen(
                         Card(
                             modifier = Modifier.clickable { selectedCard = card },
                             shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(containerColor = Surface)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column {
                                 Box(
@@ -498,18 +467,18 @@ private fun CollectionScreen(
                                         contentScale = ContentScale.Fit
                                     )
                                     if (quantity > 0) {
-                                        Surface(
+                                        MaterialTheme.colorScheme.surface(
                                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                                             shape = RoundedCornerShape(10.dp),
-                                            color = Accent
+                                            color = MaterialTheme.colorScheme.primary
                                         ) {
-                                            Text("×$quantity", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                            Text("×$quantity", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                                         }
                                     }
                                 }
                                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(card.name, color = Color.White, maxLines = 2, fontWeight = FontWeight.SemiBold)
-                                    Text("${card.set} · ${card.number} · ${card.rarity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                    Text(card.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, fontWeight = FontWeight.SemiBold)
+                                    Text("${card.set} · ${card.number} · ${card.rarity}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                                     Row(
                                         Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -523,15 +492,15 @@ private fun CollectionScreen(
                                                     withContext(Dispatchers.Main) { onChanged(updated) }
                                                 }
                                             }
-                                        }) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
-                                        Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) AccentSoft else Muted, style = MaterialTheme.typography.labelMedium)
+                                        }) { Icon(Icons.Outlined.Remove, "Restar", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                        Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                                         IconButton(onClick = {
                                             scope.launch(Dispatchers.IO) {
                                                 database.incrementCard(CollectionCard(key, card.name, card.set, card.number.toString(), 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
                                                 val updated = database.getCards()
                                                 withContext(Dispatchers.Main) { onChanged(updated) }
                                             }
-                                        }) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
+                                        }) { Icon(Icons.Outlined.Add, "Agregar", tint = MaterialTheme.colorScheme.primary) }
                                     }
                                 }
                             }
@@ -552,9 +521,9 @@ private fun CollectionScreen(
                         modifier = Modifier.fillMaxWidth().height(260.dp),
                         contentScale = ContentScale.Fit
                     )
-                    Text("${card.set} · #${card.number} · ${card.rarity}", color = Muted)
-                    Text(if (card.trainer) "Entrenador" else "Pokémon · ${card.element}", color = AccentSoft)
-                    Text("Cantidad registrada: ×$quantity", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("${card.set} · #${card.number} · ${card.rarity}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (card.trainer) "Entrenador" else "Pokémon · ${card.element}", color = MaterialTheme.colorScheme.secondary)
+                    Text("Cantidad registrada: ×$quantity", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                     val key = "${card.set}#${card.number}"
                     val wished = key in wishlist
                     TextButton(onClick = {
@@ -578,8 +547,8 @@ private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (L
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Mazos", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("${decks.size} mazos guardados", color = Muted)
+                Text("Mazos", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("${decks.size} mazos guardados", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             FilledTonalButton(onClick = onNewDeck) {
                 Icon(Icons.Outlined.Add, null)
@@ -602,20 +571,20 @@ private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (L
                         onClick = { onOpen(deck.id) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(Surface)
+                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
                     ) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = RoundedCornerShape(14.dp), color = SurfaceRaised) {
-                                Icon(Icons.Outlined.GridView, null, tint = Accent, modifier = Modifier.padding(12.dp))
+                            MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Icon(Icons.Outlined.GridView, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp))
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(deck.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text("${deck.cardCount}/20 cartas · ${deck.energyCount} energías", color = Muted)
+                                Text(deck.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                Text("${deck.cardCount}/20 cartas · ${deck.energyCount} energías", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(
                                 if (deck.valid) "VÁLIDO" else "REVISAR",
-                                color = if (deck.valid) AccentSoft else Color(0xFFFFB86B),
+                                color = if (deck.valid) MaterialTheme.colorScheme.secondary else Color(0xFFFFB86B),
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelSmall
                             )
@@ -651,20 +620,20 @@ private fun StrategyScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text("Estrategia IA", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Convierte tu colección en una propuesta de juego.", color = Muted)
+            Text("Estrategia IA", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Convierte tu colección en una propuesta de juego.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(SurfaceBlue)) {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = Accent.copy(alpha = 0.15f)) {
-                            Icon(Icons.Outlined.AutoAwesome, null, tint = Accent, modifier = Modifier.padding(10.dp))
+                        MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                            Icon(Icons.Outlined.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
                         }
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text("Constructor estratégico", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("20 cartas · 1–3 energías", color = AccentSoft, style = MaterialTheme.typography.labelMedium)
+                            Text("Constructor estratégico", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("20 cartas · 1–3 energías", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                     Text("Grok analiza únicamente las cartas registradas y propone un mazo válido.", color = Color(0xFFD0D8E3))
@@ -687,20 +656,20 @@ private fun StrategyScreen(
                                 }
                             }
                         )
-                        Text("La clave se guarda solo en este dispositivo.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Text("La clave se guarda solo en este dispositivo.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                     if (distinctHoldings < 10) {
-                        Surface(
+                        MaterialTheme.colorScheme.surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            color = Surface
+                            color = MaterialTheme.colorScheme.surface
                         ) {
                             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.Info, null, tint = Accent)
+                                Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(10.dp))
                                 Column {
-                                    Text("Colección insuficiente", color = Color.White, fontWeight = FontWeight.SemiBold)
-                                    Text("Registra al menos 10 cartas distintas para habilitar el análisis.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                                    Text("Colección insuficiente", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                    Text("Registra al menos 10 cartas distintas para habilitar el análisis.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
@@ -733,29 +702,29 @@ private fun StrategyScreen(
                         Text(if (busy) "Analizando colección..." else "Generar propuesta", fontWeight = FontWeight.Bold)
                     }
                     proposal?.let { p ->
-                        HorizontalDivider(color = Divider)
-                        Text("Propuesta", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        Text("Propuesta", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AssistChip(onClick = {}, label = { Text("${p.deck.totalCards}/20 cartas") })
                             AssistChip(onClick = {}, label = { Text("${p.deck.energies.size} energías") })
                             AssistChip(onClick = {}, label = { Text(if (p.deck.isValid) "Válido" else "Revisar") })
                         }
-                        Text(p.deck.name, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Energías: ${p.deck.energies.joinToString(" · ")}", color = AccentSoft)
-                        Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = Muted)
+                        Text(p.deck.name, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Energías: ${p.deck.energies.joinToString(" · ")}", color = MaterialTheme.colorScheme.secondary)
+                        Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             p.deck.cards.forEach { card ->
-                                Surface(
+                                MaterialTheme.colorScheme.surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
-                                    color = Surface
+                                    color = MaterialTheme.colorScheme.surface
                                 ) {
                                     Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
-                                            Text(card.name, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                            Text("${card.setCode} · #${card.number} · ${card.category}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                            Text(card.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                            Text("${card.setCode} · #${card.number} · ${card.category}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                                         }
-                                        Text("×${card.quantity}", color = AccentSoft, fontWeight = FontWeight.Bold)
+                                        Text("×${card.quantity}", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -777,11 +746,11 @@ private fun StrategyScreen(
                             Text("Guardar mazo")
                         }
                     }
-                    message?.let { Text(it, color = if (it.startsWith("Mazo")) AccentSoft else Color(0xFFFFB86B), fontWeight = FontWeight.SemiBold) }
+                    message?.let { Text(it, color = if (it.startsWith("Mazo")) MaterialTheme.colorScheme.secondary else Color(0xFFFFB86B), fontWeight = FontWeight.SemiBold) }
                     explanation?.let {
-                        HorizontalDivider(color = Divider)
-                        Text("Criterio de la IA", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(it, color = Muted)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        Text("Criterio de la IA", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -791,15 +760,15 @@ private fun StrategyScreen(
 
 @Composable
 private fun EmptyCard(title: String, text: String) {
-    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), color = Surface) {
+    MaterialTheme.colorScheme.surface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = RoundedCornerShape(14.dp), color = SurfaceRaised) {
-                Icon(Icons.Outlined.Info, null, tint = Accent, modifier = Modifier.padding(10.dp))
+            MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text(text, color = Muted)
+                Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -824,10 +793,10 @@ private fun DeckBuilderScreen(
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onCancel) { Icon(Icons.Outlined.ArrowBack, "Atrás") }
-            Text("Nuevo mazo", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Nuevo mazo", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Text("$total / 20 cartas", color = if (total == 20) AccentSoft else Muted, fontWeight = FontWeight.SemiBold)
+        Text("$total / 20 cartas", color = if (total == 20) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             (1..8).forEach { e ->
                 FilterChip(
@@ -846,13 +815,13 @@ private fun DeckBuilderScreen(
                 val max = minOf(2, card.quantity)
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(card.name, color = Color.White, maxLines = 1)
-                        Text("${card.setCode} #${card.number} · tienes ${card.quantity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Text(card.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                        Text("${card.setCode} #${card.number} · tienes ${card.quantity}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                     IconButton(onClick = { if (qty > 0) selected[card.key] = qty - 1 }, enabled = qty > 0) {
                         Icon(Icons.Outlined.Remove, "Quitar")
                     }
-                    Text("$qty", color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
+                    Text("$qty", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 8.dp))
                     IconButton(onClick = { if (qty < max && total < 20) selected[card.key] = qty + 1 }, enabled = qty < max && total < 20) {
                         Icon(Icons.Outlined.Add, "Agregar")
                     }
@@ -896,9 +865,9 @@ private fun SettingsScreen(
     Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Atrás") }
-            Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
-        Text("Clave de xAI (Grok)", color = Color.White, fontWeight = FontWeight.SemiBold)
+        Text("Clave de xAI (Grok)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(
             value = key,
             onValueChange = { key = it },
@@ -917,10 +886,10 @@ private fun SettingsScreen(
                 message = "Clave eliminada"
             }) { Text("Borrar") }
         }
-        message?.let { Text(it, color = AccentSoft) }
-        Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = Muted, style = MaterialTheme.typography.bodySmall)
-        HorizontalDivider(color = Divider)
-        Text("Modelo de IA", color = Color.White, fontWeight = FontWeight.SemiBold)
+        message?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
+        Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Text("Modelo de IA", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
         var model by remember { mutableStateOf(aiClient.currentModel()) }
         OutlinedTextField(
             value = model,
@@ -933,19 +902,19 @@ private fun SettingsScreen(
             aiClient.saveModel(model.trim())
             message = "Modelo guardado: ${aiClient.currentModel()}"
         }) { Text("Guardar modelo") }
-        HorizontalDivider(color = Divider)
-        Text("Apariencia", color = Color.White, fontWeight = FontWeight.SemiBold)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Text("Apariencia", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
         var dark by remember { mutableStateOf(aiClient.isDarkTheme()) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Tema oscuro", color = Color.White, modifier = Modifier.weight(1f))
+            Text("Tema oscuro", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             Switch(checked = dark, onCheckedChange = {
                 dark = it
                 aiClient.saveDarkTheme(it)
                 message = "Tema guardado. Reinicia la app para aplicarlo."
             })
         }
-        HorizontalDivider(color = Divider)
-        Text("Colección", color = Color.White, fontWeight = FontWeight.SemiBold)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Text("Colección", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
         var exportText by remember { mutableStateOf("") }
         var importText by remember { mutableStateOf("") }
         Button(onClick = {
@@ -987,10 +956,10 @@ private fun SettingsScreen(
                 }
             }, enabled = importText.isNotBlank()) { Text("Reemplazar") }
         }
-        HorizontalDivider(color = Divider)
-        Text("Versión", color = Color.White, fontWeight = FontWeight.SemiBold)
-        Text("TCG LAB NEXT · en desarrollo", color = Muted)
-        Text("App fan no oficial. Pokémon es marca de Nintendo / Creatures / GAME FREAK.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Text("Versión", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+        Text("TCG LAB NEXT · en desarrollo", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("App fan no oficial. Pokémon es marca de Nintendo / Creatures / GAME FREAK.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
