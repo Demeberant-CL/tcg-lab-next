@@ -157,7 +157,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
         } else {
             androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(decks, key = { it.id }) { deck ->
-                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface), onClick = { onOpen(deck.id) }) {
+                    Card(onClick = { onOpen(deck.id) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Outlined.GridView, null, tint = Accent)
                             Spacer(Modifier.width(12.dp))
