@@ -110,15 +110,50 @@ class AiDeckClient(context: Context) {
                 val energiesJson = json.optJSONArray("energies") ?: JSONArray()
                 val energies = buildList { for (i in 0 until energiesJson.length()) add(energiesJson.getInt(i)) }.distinct()
                 if (energies.size !in 1..3 || energies.any { it !in 1..8 }) return@withContext Result.failure(IllegalStateException("La IA devolvió energías inválidas."))
-                val cardsJson = json.optJSONArray("cards") ?: return@withContext Result.failure(IllegalStateException("La IA no devolvió cartas."))
-                val cards = mutableListOf<DeckCard>()
+                val cardsJson = json.optJSONArray("cards")
+                    ?: return@withContext Result.failure(IllegalStateException("La IA no devolvió cartas."))
+                val merged = linkedMapOf<String, Triple<String, Int, Int>>()
                 for (i in 0 until cardsJson.length()) {
                     val item = cardsJson.getJSONObject(i)
-                    val set = item.getString("set"); val number = item.getInt("number"); val quantity = item.getInt("quantity")
-                    val cc = catalog.find { it.set.equals(set, true) && it.number == number } ?: return@withContext Result.failure(IllegalStateException("Carta inexistente: $set#$number"))
-                    val ownedQty = holdings.firstOrNull { it.setCode.equals(set, true) && it.number == number.toString() }?.quantity ?: 0
-                    if (quantity !in 1..2 || quantity > ownedQty) return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de ${cc.name} de las disponibles."))
-                    cards += DeckCard(set, number.toString(), cc.name, if (cc.trainer) "Entrenadores" else "Pokémon", quantity, Catalog.imageUrl(cc), cc.entityId)
+                    val set = item.getString("set").trim()
+                    val number = item.getInt("number")
+                    val quantity = item.getInt("quantity")
+                    if (quantity !in 1..2) {
+                        return@withContext Result.failure(IllegalStateException("Cantidad inválida para \$set#\$number."))
+                    }
+                    val key = "\$set#\$number"
+                    val previous = merged[key]
+                    merged[key] = if (previous == null) {
+                        Triple(set, number, quantity)
+                    } else {
+                        Triple(previous.first, previous.second, previous.third + quantity)
+                    }
+                }
+
+                val ownedByKey = holdings
+                    .filter { it.quantity > 0 }
+                    .associateBy { "\${it.setCode.uppercase()}#\${it.number.toIntOrNull() ?: it.number}" }
+
+                val cards = mutableListOf<DeckCard>()
+                for ((key, entry) in merged) {
+                    val set = entry.first
+                    val number = entry.second
+                    val quantity = entry.third
+                    val cc = catalog.find { it.set.equals(set, true) && it.number == number }
+                        ?: return@withContext Result.failure(IllegalStateException("Carta inexistente: $key"))
+                    val ownedQty = ownedByKey["\${cc.set.uppercase()}#$number"]?.quantity ?: 0
+                    if (quantity > ownedQty) {
+                        return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de \${cc.name} de las disponibles."))
+                    }
+                    cards += DeckCard(
+                        set,
+                        number.toString(),
+                        cc.name,
+                        if (cc.trainer) "Entrenadores" else "Pokémon",
+                        quantity,
+                        Catalog.imageUrl(cc),
+                        cc.entityId
+                    )
                 }
                 val deck = Deck(0L, json.optString("name").ifBlank { "Mazo IA" }, cards, energies)
                 if (!deck.isValid) return@withContext Result.failure(IllegalStateException("La IA devolvió un mazo que no cumple las 20 cartas."))
