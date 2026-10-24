@@ -141,19 +141,39 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
         writableDatabase.delete("collection_cards", "key = ?", arrayOf(key))
     }
 
-    fun incrementCard(card: CollectionCard) {
-        writableDatabase.execSQL(
-            """INSERT INTO collection_cards(key,name,set_code,number,quantity,image_url,category)
-               VALUES(?,?,?,?,1,?,?)
-               ON CONFLICT(key) DO UPDATE SET quantity = MIN(quantity + 1, 99)""",
-            arrayOf(card.key, card.name, card.setCode, card.number, card.imageUrl, card.category)
-        )
-    }
-
-    fun decrementCard(key: String) {
+    /**
+     * Adjusts one collection quantity atomically and returns the resulting quantity.
+     * The write is serialized by SQLite, so rapid +/- taps cannot overwrite each other
+     * with stale reads from the UI.
+     */
+    fun adjustCardQuantity(card: CollectionCard, delta: Int): Int {
+        require(delta == 1 || delta == -1) { "El cambio debe ser +1 o -1." }
         val db = writableDatabase
-        db.execSQL("UPDATE collection_cards SET quantity = quantity - 1 WHERE key = ?", arrayOf(key))
-        db.execSQL("DELETE FROM collection_cards WHERE key = ? AND quantity <= 0", arrayOf(key))
+        db.beginTransaction()
+        try {
+            if (delta > 0) {
+                db.execSQL(
+                    """INSERT INTO collection_cards(key,name,set_code,number,quantity,image_url,category)
+                       VALUES(?,?,?,?,1,?,?)
+                       ON CONFLICT(key) DO UPDATE SET quantity = MIN(quantity + 1, 99)""",
+                    arrayOf(card.key, card.name, card.setCode, card.number, card.imageUrl, card.category)
+                )
+            } else {
+                db.execSQL(
+                    "UPDATE collection_cards SET quantity = MAX(quantity - 1, 0) WHERE key = ?",
+                    arrayOf(card.key)
+                )
+                db.execSQL("DELETE FROM collection_cards WHERE key = ? AND quantity <= 0", arrayOf(card.key))
+            }
+            val quantity = db.rawQuery(
+                "SELECT quantity FROM collection_cards WHERE key = ?",
+                arrayOf(card.key)
+            ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+            db.setTransactionSuccessful()
+            return quantity
+        } finally {
+            db.endTransaction()
+        }
     }
 
 
