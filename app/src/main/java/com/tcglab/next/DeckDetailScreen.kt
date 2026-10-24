@@ -20,9 +20,9 @@ import com.tcglab.next.data.DeckQr
 import com.tcglab.next.data.TcgDatabase
 import androidx.compose.ui.graphics.Color
 
-private val DetailDetailSurface = Color(0xFF111823)
+private val DetailSurface = Color(0xFF111823)
 private val DetailAccent = Color(0xFF58A6FF)
-private val DetailDetailMuted = Color(0xFF8E9AAA)
+private val DetailMuted = Color(0xFF8E9AAA)
 
 @Composable
 fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDeleted: () -> Unit) {
@@ -34,16 +34,16 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
             IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Volver") }
             Column(Modifier.weight(1f)) {
                 Text(deck.name, style = MaterialTheme.typography.headlineSmall)
-                Text("${deck.totalCards}/20 cartas · ${deck.energies.size} energías", color = DetailDetailMuted)
+                Text("${deck.totalCards}/20 cartas · ${deck.energies.size} energías", color = DetailMuted)
             }
-            Text(if (deck.isValid) "VÁLIDO" else "REVISAR", color = if (deck.isValid) DetailAccent else DetailDetailMuted)
+            Text(if (deck.isValid) "VÁLIDO" else "REVISAR", color = if (deck.isValid) DetailAccent else DetailMuted)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = { showQr = !showQr }) { Text(if (showQr) "Ocultar QR" else "Mostrar QR") }
             OutlinedButton(onClick = { confirmDelete = true }) { Icon(Icons.Outlined.Delete, null); Spacer(Modifier.width(6.dp)); Text("Eliminar") }
         }
         if (showQr) {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(DetailDetailSurface)) {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(DetailSurface)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(qr.asImageBitmap(), contentDescription = "QR del mazo", modifier = Modifier.size(280.dp))
                     Text("Código del mazo", style = MaterialTheme.typography.titleMedium)
