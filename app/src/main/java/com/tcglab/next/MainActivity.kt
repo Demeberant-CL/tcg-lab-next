@@ -170,23 +170,6 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     aiClient
                 ) { updated -> decks.value = updated }
             }
-                        )
-                    } ?: run { selectedDeck = null }
-                } else {
-                    DecksScreen(
-                        Modifier.padding(padding),
-                        decks.value,
-                        onOpen = { selectedDeckId = it },
-                        onStrategy = { selected = 3 }
-                    )
-                }
-                else -> StrategyScreen(
-                    Modifier.padding(padding),
-                    cards.value,
-                    database,
-                    aiClient
-                ) { decks.value = database.getDecks() }
-            }
         }
     }
 }
