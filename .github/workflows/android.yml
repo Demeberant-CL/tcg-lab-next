@@ -17,13 +17,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
       - name: Verify Gradle
-        run: gradle --version
+        run: ./gradlew --version
       - name: Lint
-        run: gradle lint --no-daemon
+        run: ./gradlew lint --no-daemon
       - name: Unit tests
-        run: gradle testDebugUnitTest --no-daemon
+        run: ./gradlew testDebugUnitTest --no-daemon
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
       - name: Verify INTERNET permission in APK
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
