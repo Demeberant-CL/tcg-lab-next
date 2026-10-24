@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
