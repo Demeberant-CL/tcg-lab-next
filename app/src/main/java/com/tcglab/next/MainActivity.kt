@@ -386,14 +386,16 @@ private fun CollectionScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var ownership by rememberSaveable { mutableStateOf("Todas") }
+    var setFilter by rememberSaveable { mutableStateOf("Todos") }
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
     val ownedKeys = remember(holdings) { holdings.map { it.key }.toSet() }
-    val visible = remember(query, filter, ownership, catalog, ownedKeys) {
+    val visible = remember(query, filter, ownership, setFilter, catalog, ownedKeys) {
         val q = query.trim()
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
+            .filter { setFilter == "Todos" || it.set == setFilter }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) || "${it.set}-${it.number}".contains(q, ignoreCase = true) }
             .filter {
                 val key = "${it.set}#${it.number}"
@@ -429,21 +431,27 @@ private fun CollectionScreen(
                 FilterChip(selected = ownership == option, onClick = { ownership = option }, label = { Text(option) })
             }
         }
-        LazyColumn(
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            FilterChip(selected = setFilter == "Todos", onClick = { setFilter = "Todos" }, label = { Text("Todos los sets") })
+            Catalog.allSets().take(6).forEach { s ->
+                FilterChip(selected = setFilter == s.code, onClick = { setFilter = s.code }, label = { Text(s.code) })
+            }
+        }
+        if (visible.isEmpty()) {
+            EmptyCard("Sin resultados", "Prueba con otro nombre, ID o cambia el filtro.")
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 148.dp),
             modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            if (visible.isEmpty()) {
-                item { EmptyCard("Sin resultados", "Prueba con otro nombre, ID o cambia el filtro.") }
-            }
-            items(visible.chunked(2), key = { row -> row.joinToString("|") { "${it.set}:${it.number}:${it.entityId}" } }) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { card ->
+            items(visible, key = { "${it.set}#${it.number}" }) { card ->
                         val key = "${card.set}#${card.number}"
                         val quantity = holdingByKey[key]?.quantity ?: 0
                         Card(
-                            modifier = Modifier.weight(1f).clickable { selectedCard = card },
+                            modifier = Modifier.clickable { selectedCard = card },
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Surface)
                         ) {
@@ -497,9 +505,6 @@ private fun CollectionScreen(
                                 }
                             }
                         }
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
             }
         }
     }
