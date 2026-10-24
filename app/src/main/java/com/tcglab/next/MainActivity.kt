@@ -3,6 +3,10 @@ package com.tcglab.next
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.tcglab.next.ui.theme.TcgLabTheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,20 +60,33 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseHolder.init(applicationContext)
-        setContent { TcgLabNextApp(database, AiDeckClient(this)) }
+        enableEdgeToEdge()
+        setContent {
+            TcgLabTheme {
+                TcgLabNextApp(database, AiDeckClient(this))
+            }
+        }
     }
     // Database is a process singleton; do not close it here.
 }
 
 @Composable
 private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
-    var selected by remember { mutableIntStateOf(0) }
+    var selected by rememberSaveable { mutableIntStateOf(0) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
     val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
     val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
+
+    BackHandler(enabled = selectedDeck != null || selected != 0) {
+        if (selectedDeck != null) {
+            selectedDeck = null
+        } else {
+            selected = 0
+        }
+    }
     var loading by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -554,7 +571,7 @@ private fun StrategyScreen(
 ) {
     val scope = rememberCoroutineScope()
     var key by remember { mutableStateOf("") }
-    var goal by remember { mutableStateOf("") }
+    var goal by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var explanation by remember { mutableStateOf<String?>(null) }
