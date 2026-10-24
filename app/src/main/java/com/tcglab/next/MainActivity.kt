@@ -400,6 +400,9 @@ private fun CollectionScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
+            if (visible.isEmpty()) {
+                item { EmptyCard("Sin resultados", "Prueba con otro nombre, ID o cambia el filtro.") }
+            }
             items(visible.chunked(2), key = { row -> row.joinToString("|") { "${it.set}:${it.number}:${it.entityId}" } }) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { card ->
