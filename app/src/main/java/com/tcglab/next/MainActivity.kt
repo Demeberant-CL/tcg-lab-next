@@ -48,6 +48,8 @@ import com.tcglab.next.data.TcgDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class MainActivity : ComponentActivity() {
     private val database: TcgDatabase get() = DatabaseHolder.db
@@ -387,9 +389,12 @@ private fun CollectionScreen(
     var wishlist by remember { mutableStateOf(emptySet<String>()) }
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
-    val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
+    var localHoldings by remember(holdings) { mutableStateOf(holdings) }
+    val holdingByKey = remember(localHoldings) { localHoldings.associateBy { it.key } }
+    val quantityMutex = remember { Mutex() }
+    var quantityError by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wishlist = withContext(Dispatchers.IO) { database.getWishlist() } }
-    val ownedKeys = remember(holdings) { holdings.map { it.key }.toSet() }
+    val ownedKeys = remember(holdings) { localHoldings.map { it.key }.toSet() }
     val visible = remember(query, filter, ownership, setFilter, showWishlistOnly, catalog, ownedKeys, wishlist) {
         val q = query.trim()
         catalog.asSequence()
@@ -404,14 +409,14 @@ private fun CollectionScreen(
             .toList()
     }
     val filteredCatalog = if (setFilter == "Todos") catalog else catalog.filter { it.set == setFilter }
-    val uniqueOwned = holdings.filter { setFilter == "Todos" || it.setCode == setFilter }.distinctBy { it.key }.size
+    val uniqueOwned = localHoldings.filter { setFilter == "Todos" || it.setCode == setFilter }.distinctBy { it.key }.size
     val progress = if (filteredCatalog.isNotEmpty()) uniqueOwned.toFloat() / filteredCatalog.size else 0f
     Column(
         modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Colección", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("${holdings.sumOf { it.quantity }} cartas · $uniqueOwned / ${filteredCatalog.size} únicas${if (setFilter != "Todos") " ($setFilter)" else ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${localHoldings.sumOf { it.quantity }} cartas · $uniqueOwned / ${filteredCatalog.size} únicas${if (setFilter != "Todos") " ($setFilter)" else ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
         OutlinedTextField(
             value = query,
@@ -457,6 +462,9 @@ private fun CollectionScreen(
             onClick = { showWishlistOnly = !showWishlistOnly },
             label = { Text(if (showWishlistOnly) "Solo deseadas" else "Mostrar deseadas") }
         )
+        quantityError?.let { error ->
+            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
         if (visible.isEmpty()) {
             EmptyCard("Sin resultados", "Prueba con otro nombre, ID o cambia el filtro.")
         }
@@ -506,19 +514,77 @@ private fun CollectionScreen(
                                     ) {
                                         IconButton(onClick = {
                                             if (quantity > 0) {
-                                                scope.launch(Dispatchers.IO) {
-                                                    database.decrementCard(key)
-                                                    val updated = database.getCards()
-                                                    withContext(Dispatchers.Main) { onChanged(updated) }
+                                                scope.launch {
+                                                    quantityMutex.withLock {
+                                                        runCatching {
+                                                            withContext(Dispatchers.IO) {
+                                                                database.adjustCardQuantity(
+                                                                    CollectionCard(
+                                                                        key,
+                                                                        card.name,
+                                                                        card.set,
+                                                                        card.number.toString(),
+                                                                        quantity,
+                                                                        Catalog.imageUrl(card),
+                                                                        if (card.trainer) "Entrenadores" else "Pokémon"
+                                                                    ),
+                                                                    -1
+                                                                )
+                                                            }
+                                                        }.onSuccess { newQuantity ->
+                                                            val updated = localHoldings.toMutableList().apply {
+                                                                val index = indexOfFirst { it.key == key }
+                                                                if (newQuantity == 0) {
+                                                                    if (index >= 0) removeAt(index)
+                                                                } else if (index >= 0) {
+                                                                    this[index] = this[index].copy(quantity = newQuantity)
+                                                                }
+                                                            }
+                                                            localHoldings = updated
+                                                            onChanged(updated)
+                                                            quantityError = null
+                                                        }.onFailure {
+                                                            quantityError = "No se pudo actualizar la cantidad."
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }) { Icon(Icons.Outlined.Remove, "Restar", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                                         Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                                         IconButton(onClick = {
-                                            scope.launch(Dispatchers.IO) {
-                                                database.incrementCard(CollectionCard(key, card.name, card.set, card.number.toString(), 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
-                                                val updated = database.getCards()
-                                                withContext(Dispatchers.Main) { onChanged(updated) }
+                                            scope.launch {
+                                                quantityMutex.withLock {
+                                                    runCatching {
+                                                        withContext(Dispatchers.IO) {
+                                                            database.adjustCardQuantity(
+                                                                CollectionCard(
+                                                                    key,
+                                                                    card.name,
+                                                                    card.set,
+                                                                    card.number.toString(),
+                                                                    quantity,
+                                                                    Catalog.imageUrl(card),
+                                                                    if (card.trainer) "Entrenadores" else "Pokémon"
+                                                                ),
+                                                                1
+                                                            )
+                                                        }
+                                                    }.onSuccess { newQuantity ->
+                                                        val updated = localHoldings.toMutableList().apply {
+                                                            val index = indexOfFirst { it.key == key }
+                                                            if (index >= 0) {
+                                                                this[index] = this[index].copy(quantity = newQuantity)
+                                                            } else if (newQuantity > 0) {
+                                                                add(CollectionCard(key, card.name, card.set, card.number.toString(), newQuantity, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                            }
+                                                        }
+                                                        localHoldings = updated
+                                                        onChanged(updated)
+                                                        quantityError = null
+                                                    }.onFailure {
+                                                        quantityError = "No se pudo actualizar la cantidad."
+                                                    }
+                                                }
                                             }
                                         }) { Icon(Icons.Outlined.Add, "Agregar", tint = MaterialTheme.colorScheme.primary) }
                                     }
