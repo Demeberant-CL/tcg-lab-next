@@ -14,18 +14,23 @@ import java.util.concurrent.TimeUnit
 data class AiDeckProposal(val deck: Deck, val explanation: String)
 
 class AiDeckClient(context: Context) {
-    private val prefs = context.getSharedPreferences("tcg_lab_ai", Context.MODE_PRIVATE)
+    private val prefs = context.applicationContext.getSharedPreferences("tcg_lab_ai", Context.MODE_PRIVATE)
+    private val keyStore = SecureKeyStore(context)
+    private companion object {
+        const val DEFAULT_MODEL = "grok-4.7"
+    }
     private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(180, TimeUnit.SECONDS).build()
-    fun hasKey(): Boolean = prefs.getString("xai_key", "").orEmpty().isNotBlank()
-    fun currentKey(): String? = prefs.getString("xai_key", null)?.takeIf { it.isNotBlank() }
-    fun saveKey(key: String) { prefs.edit().putString("xai_key", key.trim()).apply() }
-    fun currentModel(): String = prefs.getString("xai_model", "grok-4.7") ?: "grok-4.7"
-    fun saveModel(model: String) { prefs.edit().putString("xai_model", model.trim().ifBlank { "grok-4.7" }).apply() }
+    fun hasKey(): Boolean = currentKey() != null
+    fun currentKey(): String? = keyStore.get()?.takeIf { it.isNotBlank() }
+    fun saveKey(key: String) { keyStore.put(key) }
+    fun clearKey() { keyStore.clear() }
+    fun currentModel(): String = prefs.getString("xai_model", DEFAULT_MODEL)?.ifBlank { DEFAULT_MODEL } ?: DEFAULT_MODEL
+    fun saveModel(model: String) { prefs.edit().putString("xai_model", model.trim().ifBlank { DEFAULT_MODEL }).apply() }
     fun isDarkTheme(): Boolean = prefs.getBoolean("dark_theme", true)
     fun saveDarkTheme(dark: Boolean) { prefs.edit().putBoolean("dark_theme", dark).apply() }
 
     suspend fun generate(holdings: List<CollectionCard>, catalog: List<CatalogCard>, goal: String): Result<AiDeckProposal> = withContext(Dispatchers.IO) {
-        val key = prefs.getString("xai_key", "").orEmpty()
+        val key = currentKey().orEmpty()
         if (key.isBlank()) return@withContext Result.failure(IllegalStateException("Configura primero la clave de xAI."))
         val owned = holdings.filter { it.quantity > 0 }.mapNotNull { h ->
             catalog.find { it.set.equals(h.setCode, true) && it.number.toString() == h.number }?.let {
