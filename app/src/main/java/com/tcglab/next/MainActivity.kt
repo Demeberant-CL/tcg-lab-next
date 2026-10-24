@@ -39,8 +39,8 @@ import com.tcglab.next.data.AiDeckProposal
 import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
-import com.tcglab.next.data.DeckSummary
 import com.tcglab.next.data.Deck
+import com.tcglab.next.data.DeckCard
 import com.tcglab.next.data.TcgDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,17 +74,18 @@ class MainActivity : ComponentActivity() {
 private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
+    var building by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
     val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
     val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
 
-    BackHandler(enabled = selectedDeck != null || selected != 0) {
-        if (selectedDeck != null) {
-            selectedDeck = null
-        } else {
-            selected = 0
+    BackHandler(enabled = selectedDeck != null || building || selected != 0) {
+        when {
+            building -> building = false
+            selectedDeck != null -> selectedDeck = null
+            else -> selected = 0
         }
     }
     var loading by remember { mutableStateOf(true) }
@@ -167,7 +168,21 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     cards.value,
                     database
                 ) { updated -> cards.value = updated }
-                2 -> if (selectedDeck != null) {
+                2 -> if (building) {
+                    DeckBuilderScreen(
+                        modifier = Modifier.weight(1f),
+                        holdings = cards.value,
+                        database = database,
+                        onSaved = {
+                            building = false
+                            scope.launch(Dispatchers.IO) {
+                                val updated = database.getDecks()
+                                withContext(Dispatchers.Main) { decks.value = updated }
+                            }
+                        },
+                        onCancel = { building = false }
+                    )
+                } else if (selectedDeck != null) {
                     DeckDetailScreen(
                         selectedDeck!!,
                         database,
@@ -532,17 +547,23 @@ private fun CollectionScreen(
 }
 
 @Composable
-private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (Long) -> Unit, onStrategy: () -> Unit) {
+private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (Long) -> Unit, onStrategy: () -> Unit, onNewDeck: () -> Unit = {}) {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Mazos", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("${decks.size} mazos guardados", color = Muted)
             }
+            FilledTonalButton(onClick = onNewDeck) {
+                Icon(Icons.Outlined.Add, null)
+                Spacer(Modifier.width(4.dp))
+                Text("Nuevo")
+            }
+            Spacer(Modifier.width(8.dp))
             FilledTonalButton(onClick = onStrategy) {
                 Icon(Icons.Outlined.AutoAwesome, null)
                 Spacer(Modifier.width(6.dp))
-                Text("Crear con IA")
+                Text("IA")
             }
         }
         if (decks.isEmpty()) {
@@ -757,6 +778,79 @@ private fun EmptyCard(title: String, text: String) {
     }
 }
 
+
+
+@Composable
+private fun DeckBuilderScreen(
+    modifier: Modifier,
+    holdings: List<CollectionCard>,
+    database: TcgDatabase,
+    onSaved: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var name by rememberSaveable { mutableStateOf("Mi mazo") }
+    val selected = remember { mutableStateMapOf<String, Int>() }
+    val energies = remember { mutableStateListOf<Int>() }
+    val scope = rememberCoroutineScope()
+    val total = selected.values.sum()
+
+    Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onCancel) { Icon(Icons.Outlined.ArrowBack, "Atrás") }
+            Text("Nuevo mazo", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Text("$total / 20 cartas", color = if (total == 20) AccentSoft else Muted, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (1..8).forEach { e ->
+                FilterChip(
+                    selected = e in energies,
+                    onClick = {
+                        if (e in energies) energies.remove(e)
+                        else if (energies.size < 3) energies.add(e)
+                    },
+                    label = { Text(e.toString()) }
+                )
+            }
+        }
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(holdings.filter { it.quantity > 0 }, key = { it.key }) { card ->
+                val qty = selected[card.key] ?: 0
+                val max = minOf(2, card.quantity)
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(card.name, color = Color.White, maxLines = 1)
+                        Text("${card.set} #${card.number} · tienes ${card.quantity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    IconButton(onClick = { if (qty > 0) selected[card.key] = qty - 1 }, enabled = qty > 0) {
+                        Icon(Icons.Outlined.Remove, "Quitar")
+                    }
+                    Text("$qty", color = Color.White, modifier = Modifier.padding(horizontal = 8.dp))
+                    IconButton(onClick = { if (qty < max && total < 20) selected[card.key] = qty + 1 }, enabled = qty < max && total < 20) {
+                        Icon(Icons.Outlined.Add, "Agregar")
+                    }
+                }
+            }
+        }
+        Button(
+            onClick = {
+                val cards = holdings.mapNotNull { h ->
+                    val q = selected[h.key] ?: 0
+                    if (q > 0) DeckCard(h.setCode, h.number, h.name, h.category, q, h.imageUrl) else null
+                }
+                val deck = Deck(0L, name, cards, energies.toList())
+                if (deck.isValid) {
+                    scope.launch(Dispatchers.IO) {
+                        database.saveDeck(deck)
+                        withContext(Dispatchers.Main) { onSaved() }
+                    }
+                }
+            },
+            enabled = total == 20 && energies.size in 1..3,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Guardar mazo") }
+    }
+}
 
 object DatabaseHolder {
     lateinit var db: TcgDatabase
