@@ -697,16 +697,13 @@ private fun StrategyScreen(
     holdings: List<CollectionCard>,
     database: TcgDatabase,
     aiClient: AiDeckClient,
-    onDeckSaved: (List<DeckSummary>) -> Unit
+    onDeckSaved: () -> Unit,
+    viewModel: StrategyViewModel = viewModel()
 ) {
-    val scope = rememberCoroutineScope()
-    var key by remember { mutableStateOf("") }
+    val state by viewModel.state.collectAsState()
+    var key by rememberSaveable { mutableStateOf("") }
     var goal by rememberSaveable { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var explanation by remember { mutableStateOf<String?>(null) }
-    var proposal by remember { mutableStateOf<AiDeckProposal?>(null) }
-    var showKey by remember { mutableStateOf(false) }
+    var showKey by rememberSaveable { mutableStateOf(false) }
     val distinctHoldings = holdings.distinctBy { it.key }.size
 
     LazyColumn(
@@ -731,7 +728,7 @@ private fun StrategyScreen(
                             Text("20 cartas · 1–3 energías", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium)
                         }
                     }
-                    Text("Grok analiza únicamente las cartas registradas y propone un mazo válido.", color = Color(0xFFD0D8E3))
+                    Text("Grok analiza únicamente las cartas registradas y propone un mazo válido.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (!aiClient.hasKey()) {
                         OutlinedTextField(
                             value = key,
@@ -744,21 +741,14 @@ private fun StrategyScreen(
                             visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = {
                                 IconButton(onClick = { showKey = !showKey }) {
-                                    Icon(
-                                        if (showKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                        if (showKey) "Ocultar clave" else "Mostrar clave"
-                                    )
+                                    Icon(if (showKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (showKey) "Ocultar clave" else "Mostrar clave")
                                 }
                             }
                         )
                         Text("La clave se guarda solo en este dispositivo.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                     if (distinctHoldings < 10) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface
-                        ) {
+                        Surface(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
                             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(10.dp))
@@ -771,32 +761,16 @@ private fun StrategyScreen(
                     }
                     OutlinedTextField(value = goal, onValueChange = { goal = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Objetivo opcional") }, placeholder = { Text("Ej.: consistencia, agresividad, control...") }, minLines = 2, shape = RoundedCornerShape(14.dp))
                     Button(
-                        enabled = !busy && holdings.distinctBy { it.key }.size >= 10,
-                        onClick = {
-                            if (!aiClient.hasKey()) aiClient.saveKey(key)
-                            busy = true
-                            message = null
-                            explanation = null
-                            proposal = null
-                            scope.launch {
-                                aiClient.generate(holdings, Catalog.allCards(), goal)
-                                    .onSuccess {
-                                        proposal = it
-                                        explanation = it.explanation
-                                        message = "Propuesta lista para revisar."
-                                    }
-                                    .onFailure { message = it.message ?: "No se pudo generar la propuesta." }
-                                busy = false
-                            }
-                        },
+                        enabled = !state.busy && distinctHoldings >= 10,
+                        onClick = { viewModel.generate(holdings, aiClient, goal, key) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(Icons.Outlined.AutoAwesome, null)
                         Spacer(Modifier.width(8.dp))
-                        Text(if (busy) "Analizando colección..." else "Generar propuesta", fontWeight = FontWeight.Bold)
+                        Text(if (state.busy) "Analizando colección..." else "Generar propuesta", fontWeight = FontWeight.Bold)
                     }
-                    proposal?.let { p ->
+                    state.proposal?.let { p ->
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         Text("Propuesta", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -809,11 +783,7 @@ private fun StrategyScreen(
                         Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             p.deck.cards.forEach { card ->
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surface
-                                ) {
+                                Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
                                     Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(card.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
@@ -825,14 +795,7 @@ private fun StrategyScreen(
                             }
                         }
                         Button(
-                            onClick = {
-                                scope.launch {
-                                    withContext(Dispatchers.IO) { database.saveDeck(p.deck) }
-                                    message = "Mazo guardado: ${p.deck.name}"
-                                    onDeckSaved(withContext(Dispatchers.IO) { database.getDecks() })
-                                    proposal = null
-                                }
-                            },
+                            onClick = { viewModel.saveProposal(database, onDeckSaved) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
@@ -841,8 +804,8 @@ private fun StrategyScreen(
                             Text("Guardar mazo")
                         }
                     }
-                    message?.let { Text(it, color = if (it.startsWith("Mazo")) MaterialTheme.colorScheme.secondary else Color(0xFFFFB86B), fontWeight = FontWeight.SemiBold) }
-                    explanation?.let {
+                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold) }
+                    state.explanation?.let {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         Text("Criterio de la IA", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
