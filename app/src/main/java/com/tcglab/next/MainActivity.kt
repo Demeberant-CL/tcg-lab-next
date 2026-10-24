@@ -383,7 +383,7 @@ private fun CollectionScreen(
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
                 Card(
-                    Modifier.fillMaxWidth(),
+                    Modifier.weight(1f),
                     RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(Surface)
                 ) {
