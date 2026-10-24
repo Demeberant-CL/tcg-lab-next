@@ -6,8 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.tcglab.next.ui.theme.TcgLabTheme
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.tcglab.next.data.AiDeckClient
 import com.tcglab.next.data.AiDeckProposal
@@ -52,7 +52,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class MainActivity : ComponentActivity() {
-    private val database: TcgDatabase get() = DatabaseHolder.db
     private val aiClient by lazy { AiDeckClient(applicationContext) }
     private var darkTheme by mutableStateOf(true)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,98 +61,93 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TcgLabTheme(darkTheme = darkTheme) {
-                TcgLabNextApp(database, aiClient, onThemeChanged = { darkTheme = it })
+                TcgLabNextApp(aiClient, onThemeChanged = { darkTheme = it })
             }
         }
     }
-    // Database is a process singleton; do not close it here.
 }
 
 @Composable
-private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient, onThemeChanged: (Boolean) -> Unit = {}) {
+private fun TcgLabNextApp(
+    aiClient: AiDeckClient,
+    onThemeChanged: (Boolean) -> Unit = {},
+    viewModel: MainViewModel = viewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    val database = DatabaseHolder.db
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    var selectedDeckId by rememberSaveable { mutableLongStateOf(0L) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
-    var building by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
+    var building by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
-    val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
-    val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
 
-    BackHandler(enabled = selectedDeck != null || building || showSettings || selected != 0) {
+    BackHandler(enabled = selectedDeckId != 0L || building || showSettings || selected != 0) {
         when {
             showSettings -> showSettings = false
             building -> building = false
-            selectedDeck != null -> selectedDeck = null
+            selectedDeckId != 0L -> {
+                selectedDeckId = 0L
+                selectedDeck = null
+            }
             else -> selected = 0
         }
     }
-    var loading by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            Catalog.load(context)
-            val loadedCards = database.getCards()
-            val loadedDecks = database.getDecks()
-            withContext(Dispatchers.Main) {
-                cards.value = loadedCards
-                decks.value = loadedDecks
-                catalog.value = Catalog.allCards()
-                loading = false
-            }
+
+    LaunchedEffect(selectedDeckId) {
+        if (selectedDeckId != 0L) {
+            selectedDeck = withContext(Dispatchers.IO) { database.getDeck(selectedDeckId) }
+        } else {
+            selectedDeck = null
         }
     }
 
     Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                    listOf(
-                        "Inicio" to Icons.Outlined.Home,
-                        "Colección" to Icons.Outlined.CollectionsBookmark,
-                        "Mazos" to Icons.Outlined.GridView,
-                        "Estrategia" to Icons.Outlined.AutoAwesome
-                    ).forEachIndexed { i, item ->
-                        NavigationBarItem(
-                            selected = selected == i,
-                            onClick = { selected = i; selectedDeck = null },
-                            icon = { Icon(item.second, item.first) },
-                            label = { Text(item.first) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                listOf(
+                    "Inicio" to Icons.Outlined.Home,
+                    "Colección" to Icons.Outlined.CollectionsBookmark,
+                    "Mazos" to Icons.Outlined.GridView,
+                    "Estrategia" to Icons.Outlined.AutoAwesome
+                ).forEachIndexed { i, item ->
+                    NavigationBarItem(
+                        selected = selected == i,
+                        onClick = { selected = i; selectedDeckId = 0L; selectedDeck = null },
+                        icon = { Icon(item.second, item.first) },
+                        label = { Text(item.first) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
+                    )
                 }
             }
-        ) { padding ->
-            if (showSettings) {
-                SettingsScreen(
-                    modifier = Modifier.padding(padding).fillMaxSize(),
-                    aiClient = aiClient,
-                    database = database,
-                    onThemeChanged = onThemeChanged,
-                    onCollectionChanged = {
-                        scope.launch(Dispatchers.IO) {
-                            val updated = database.getCards()
-                            withContext(Dispatchers.Main) { cards.value = updated }
-                        }
-                    },
-                    onBack = { showSettings = false }
-                )
-            } else if (loading) {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            } else when (selected) {
+        }
+    ) { padding ->
+        if (showSettings) {
+            SettingsScreen(
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                aiClient = aiClient,
+                database = database,
+                onThemeChanged = onThemeChanged,
+                onCollectionChanged = { viewModel.refreshCollection() },
+                onBack = { showSettings = false }
+            )
+        } else if (state.loading) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        } else {
+            when (selected) {
                 0 -> HomeScreen(
                     Modifier.padding(padding),
-                    cards.value.sumOf { it.quantity },
-                    decks.value.size,
+                    state.collection.sumOf { it.quantity },
+                    state.decks.size,
                     onCollection = { selected = 1 },
                     onStrategy = { selected = 3 },
                     onDecks = { selected = 2 },
@@ -161,58 +155,51 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient, onTheme
                 )
                 1 -> CollectionScreen(
                     Modifier.padding(padding),
-                    catalog.value,
-                    cards.value,
+                    state.catalog,
+                    state.collection,
                     database
-                ) { updated -> cards.value = updated }
+                ) { viewModel.refreshCollection() }
                 2 -> if (building) {
                     DeckBuilderScreen(
                         modifier = Modifier.padding(padding).fillMaxSize(),
-                        holdings = cards.value,
+                        holdings = state.collection,
                         database = database,
                         onSaved = {
                             building = false
-                            scope.launch(Dispatchers.IO) {
-                                val updated = database.getDecks()
-                                withContext(Dispatchers.Main) { decks.value = updated }
-                            }
+                            viewModel.refreshDecks()
                         },
                         onCancel = { building = false }
                     )
-                } else if (selectedDeck != null) {
+                } else if (selectedDeckId != 0L && selectedDeck != null) {
                     DeckDetailScreen(
                         selectedDeck!!,
                         database,
-                        onBack = { selectedDeck = null },
+                        onBack = { selectedDeckId = 0L; selectedDeck = null },
                         onDeleted = {
+                            selectedDeckId = 0L
                             selectedDeck = null
-                            scope.launch(Dispatchers.IO) {
-                                val updated = database.getDecks()
-                                withContext(Dispatchers.Main) { decks.value = updated }
-                            }
+                            viewModel.refreshDecks()
                         }
                     )
                 } else {
                     DecksScreen(
                         Modifier.padding(padding),
-                        decks.value,
+                        state.decks,
                         onOpen = { id ->
-                            scope.launch(Dispatchers.IO) {
-                                val deck = database.getDeck(id)
-                                withContext(Dispatchers.Main) { selectedDeck = deck }
-                            }
+                            selectedDeckId = id
                         },
                         onStrategy = { selected = 3 }
                     )
                 }
                 else -> StrategyScreen(
                     Modifier.padding(padding),
-                    cards.value,
+                    state.collection,
                     database,
                     aiClient
-                ) { updated -> decks.value = updated }
+                ) { viewModel.refreshDecks() }
             }
         }
+    }
 }
 
 @Composable
