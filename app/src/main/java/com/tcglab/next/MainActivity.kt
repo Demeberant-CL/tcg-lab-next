@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Switch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,8 +64,9 @@ class MainActivity : ComponentActivity() {
         DatabaseHolder.init(applicationContext)
         enableEdgeToEdge()
         setContent {
-            TcgLabTheme {
-                TcgLabNextApp(database, AiDeckClient(this))
+            val ai = AiDeckClient(this)
+            TcgLabTheme(darkTheme = ai.isDarkTheme()) {
+                TcgLabNextApp(database, ai)
             }
         }
     }
@@ -931,6 +933,17 @@ private fun SettingsScreen(
             aiClient.saveModel(model.trim())
             message = "Modelo guardado: ${aiClient.currentModel()}"
         }) { Text("Guardar modelo") }
+        HorizontalDivider(color = Divider)
+        Text("Apariencia", color = Color.White, fontWeight = FontWeight.SemiBold)
+        var dark by remember { mutableStateOf(aiClient.isDarkTheme()) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Tema oscuro", color = Color.White, modifier = Modifier.weight(1f))
+            Switch(checked = dark, onCheckedChange = {
+                dark = it
+                aiClient.saveDarkTheme(it)
+                message = "Tema guardado. Reinicia la app para aplicarlo."
+            })
+        }
         HorizontalDivider(color = Divider)
         Text("Colección", color = Color.White, fontWeight = FontWeight.SemiBold)
         var exportText by remember { mutableStateOf("") }

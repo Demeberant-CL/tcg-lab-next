@@ -1,7 +1,9 @@
 package com.tcglab.next.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
@@ -27,10 +29,26 @@ private val DarkColors = darkColorScheme(
     outline = Divider
 )
 
+private val LightColors = lightColorScheme(
+    primary = Color(0xFF1E5BB8),
+    onPrimary = Color.White,
+    secondary = Color(0xFF3B6FB6),
+    background = Color(0xFFF7F9FC),
+    surface = Color.White,
+    surfaceVariant = Color(0xFFE8EEF6),
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1)
+)
+
 @Composable
-fun TcgLabTheme(content: @Composable () -> Unit) {
+fun TcgLabTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
     MaterialTheme(
-        colorScheme = DarkColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         content = content
     )
 }
