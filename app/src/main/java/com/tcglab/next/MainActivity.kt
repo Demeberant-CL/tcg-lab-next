@@ -208,7 +208,9 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 ) { updated -> decks.value = updated }
             }
         }
-  @Composable
+}
+
+@Composable
 private fun HomeScreen(
     modifier: Modifier,
     cardCount: Int,
