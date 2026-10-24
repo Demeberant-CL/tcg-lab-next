@@ -105,29 +105,28 @@ class AiDeckClient(context: Context) {
             .put("max_output_tokens", 4000)
             .put("text", textFormat)
 
-        fun execute(json: JSONObject) = http.newCall(
+        fun execute(json: JSONObject): okhttp3.Response = http.newCall(
             Request.Builder().url("https://api.x.ai/v1/responses")
-                .addHeader("Authorization", "Bearer \$key")
+                .addHeader("Authorization", "Bearer $key")
                 .addHeader("Content-Type", "application/json")
                 .post(json.toString().toRequestBody("application/json".toMediaType()))
                 .build()
-        )
-
+        ).execute()
         try {
-            val response = execute(body)
-            val raw = response.body?.string().orEmpty()
-            val code = response.code
-            response.close()
-            if (code == 400 || code == 422) {
-                val fallbackBody = JSONObject(body.toString()).apply { remove("text") }
-                execute(fallbackBody).use {
-                    val fallbackRaw = it.body?.string().orEmpty()
-                    if (!it.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(it.code)))
-                    return@withContext parseProposal(fallbackRaw, holdings, catalog)
+            execute(body).use { response ->
+                val raw = response.body?.string().orEmpty()
+                val code = response.code
+                if (code == 400 || code == 422) {
+                    val fallbackBody = JSONObject(body.toString()).apply { remove("text") }
+                    execute(fallbackBody).use { fallback ->
+                        val fallbackRaw = fallback.body?.string().orEmpty()
+                        if (!fallback.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(fallback.code)))
+                        return@withContext parseProposal(fallbackRaw, holdings, catalog)
+                    }
                 }
+                if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(code)))
+                return@withContext parseProposal(raw, holdings, catalog)
             }
-            if (!response.isSuccessful) return@withContext Result.failure(IllegalStateException(httpError(code)))
-            return@withContext parseProposal(raw, holdings, catalog)
         } catch (_: java.net.SocketTimeoutException) {
             Result.failure(IllegalStateException("Tiempo de espera agotado. Puedes reintentar."))
         } catch (_: java.io.IOException) {
@@ -154,7 +153,7 @@ class AiDeckClient(context: Context) {
                 }
             }.trim()
             if (output.isBlank()) return Result.failure(IllegalStateException("La IA no devolvió contenido utilizable."))
-            val jsonText = output.removePrefix("\`\`\`json").removePrefix("\`\`\`").removeSuffix("\`\`\`").trim()
+            val jsonText = output.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
             val json = JSONObject(jsonText)
             val energiesJson = json.optJSONArray("energies") ?: JSONArray()
             val energies = buildList { for (i in 0 until energiesJson.length()) add(energiesJson.getInt(i)) }.distinct()
