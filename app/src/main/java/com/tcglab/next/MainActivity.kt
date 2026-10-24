@@ -372,7 +372,7 @@ private fun CollectionScreen(
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            .take(80)
+            .take(40)
             .toList()
     }
     Column(
