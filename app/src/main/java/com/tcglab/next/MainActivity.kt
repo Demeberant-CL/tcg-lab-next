@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by remember { mutableIntStateOf(0) }
+    var selectedDeckId by remember { mutableStateOf<Long?>(null) }
     val cards = remember { mutableStateOf(database.getCards()) }
     val decks = remember { mutableStateOf(database.getDecks()) }
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent, background = Background, surface = Surface)) {
@@ -63,7 +64,13 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
             when (selected) {
                 0 -> HomeScreen(Modifier.padding(padding), cards.value.sumOf { it.quantity }, decks.value.size) { selected = 3 }
                 1 -> CollectionScreen(Modifier.padding(padding), Catalog.allCards(), cards.value, database) { cards.value = database.getCards() }
-                2 -> DecksScreen(Modifier.padding(padding), decks.value) { decks.value = database.getDecks() }
+                2 -> if (selectedDeckId != null) {
+                    database.getDeck(selectedDeckId!!)?.let { deck ->
+                        DeckDetailScreen(deck, database, onBack = { selectedDeckId = null }, onDeleted = { decks.value = database.getDecks(); selectedDeckId = null })
+                    } ?: run { selectedDeckId = null }
+                } else {
+                    DecksScreen(Modifier.padding(padding), decks.value, onOpen = { selectedDeckId = it }, onStrategy = { selected = 3 })
+                }
                 else -> StrategyScreen(Modifier.padding(padding), cards.value, database, aiClient) { decks.value = database.getDecks() }
             }
         }
@@ -120,7 +127,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
             items(visible, key = { "${it.set}#${it.number}" }) { card ->
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface)) {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Surface), onClick = { onOpen(deck.id) }) {
                     Column {
                         AsyncImage(model = Catalog.imageUrl(card), contentDescription = card.name, modifier = Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Fit)
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -139,11 +146,11 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     }
 }
 
-@Composable private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onChanged: () -> Unit) {
+@Composable private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (Long) -> Unit, onStrategy: () -> Unit) {
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text("Mazos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("${decks.size} mazos guardados", color = Muted) }
-            FilledTonalButton({}) { Icon(Icons.Outlined.AutoAwesome, null); Spacer(Modifier.width(6.dp)); Text("Crear con IA") }
+            FilledTonalButton(onClick = onStrategy) { Icon(Icons.Outlined.AutoAwesome, null); Spacer(Modifier.width(6.dp)); Text("Crear con IA") }
         }
         if (decks.isEmpty()) {
             EmptyCard("Sin mazos", "Los mazos creados con IA aparecerán aquí.")
