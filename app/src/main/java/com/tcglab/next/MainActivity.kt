@@ -33,6 +33,7 @@ import com.tcglab.next.data.Catalog
 import com.tcglab.next.data.CatalogCard
 import com.tcglab.next.data.CollectionCard
 import com.tcglab.next.data.DeckSummary
+import com.tcglab.next.data.Deck
 import com.tcglab.next.data.TcgDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by remember { mutableIntStateOf(0) }
-    var selectedDeckId by remember { mutableStateOf<Long?>(null) }
+    var selectedDeck by remember { mutableStateOf<Deck?>(null) }
     val context = LocalContext.current
     val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
     val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
@@ -111,7 +112,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     ).forEachIndexed { i, item ->
                         NavigationBarItem(
                             selected = selected == i,
-                            onClick = { selected = i; selectedDeckId = null },
+                            onClick = { selected = i; selectedDeck = null },
                             icon = { Icon(item.second, item.first) },
                             label = { Text(item.first) },
                             colors = NavigationBarItemDefaults.colors(
@@ -140,19 +141,37 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     catalog.value,
                     cards.value,
                     database
-                ) { cards.value = database.getCards() }
-                2 -> if (selectedDeckId != null) {
-                    database.getDeck(selectedDeckId!!)?.let { deck ->
-                        DeckDetailScreen(
-                            deck,
-                            database,
-                            onBack = { selectedDeckId = null },
-                            onDeleted = {
-                                decks.value = database.getDecks()
-                                selectedDeckId = null
-                            }
+                ) { updated -> cards.value = updated }
+                2 -> if (selectedDeck != null) {
+                    DeckDetailScreen(
+                        selectedDeck!!,
+                        database,
+                        onBack = { selectedDeck = null },
+                        onDeleted = {
+                            selectedDeck = null
+                            decks.value = emptyList()
+                        }
+                    )
+                } else {
+                    DecksScreen(
+                        Modifier.padding(padding),
+                        decks.value,
+                        onOpen = { id ->
+                            // Detail loading is triggered by the deck screen callback.
+                            selectedDeck = null
+                        },
+                        onStrategy = { selected = 3 }
+                    )
+                }
+                else -> StrategyScreen(
+                    Modifier.padding(padding),
+                    cards.value,
+                    database,
+                    aiClient
+                ) { updated -> decks.value = updated }
+            }
                         )
-                    } ?: run { selectedDeckId = null }
+                    } ?: run { selectedDeck = null }
                 } else {
                     DecksScreen(
                         Modifier.padding(padding),
