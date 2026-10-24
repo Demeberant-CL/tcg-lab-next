@@ -193,6 +193,7 @@ private fun HomeScreen(
     onStrategy: () -> Unit,
     onDecks: () -> Unit
 ) {
+    var showSettings by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 28.dp),
@@ -205,7 +206,7 @@ private fun HomeScreen(
                     Text("Laboratorio de estrategia", color = Muted, style = MaterialTheme.typography.bodyLarge)
                 }
                 Surface(shape = RoundedCornerShape(16.dp), color = SurfaceRaised) {
-                    IconButton(onClick = {}) {
+                    IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Outlined.Settings, "Ajustes", tint = AccentSoft)
                     }
                 }
@@ -315,6 +316,19 @@ private fun HomeScreen(
                 }
             }
         }
+    }
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("Ajustes") },
+            text = { Text("La configuración de la inteligencia artificial se gestiona desde Estrategia.") },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false; onStrategy() }) { Text("Configurar IA") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettings = false }) { Text("Cerrar") }
+            }
+        )
     }
 }
 
