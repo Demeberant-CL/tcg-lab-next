@@ -171,7 +171,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 ) { updated -> cards.value = updated }
                 2 -> if (building) {
                     DeckBuilderScreen(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.padding(padding).fillMaxSize(),
                         holdings = cards.value,
                         database = database,
                         onSaved = {
@@ -821,7 +821,7 @@ private fun DeckBuilderScreen(
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(card.name, color = Color.White, maxLines = 1)
-                        Text("${card.set} #${card.number} · tienes ${card.quantity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Text("${card.setCode} #${card.number} · tienes ${card.quantity}", color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
                     IconButton(onClick = { if (qty > 0) selected[card.key] = qty - 1 }, enabled = qty > 0) {
                         Icon(Icons.Outlined.Remove, "Quitar")
