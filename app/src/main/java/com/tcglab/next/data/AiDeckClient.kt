@@ -119,9 +119,9 @@ class AiDeckClient(context: Context) {
                     val number = item.getInt("number")
                     val quantity = item.getInt("quantity")
                     if (quantity !in 1..2) {
-                        return@withContext Result.failure(IllegalStateException("Cantidad inválida para \$set#\$number."))
+                        return@withContext Result.failure(IllegalStateException("Cantidad inválida para $set#$number."))
                     }
-                    val key = "\$set#\$number"
+                    val key = "$set#$number"
                     val previous = merged[key]
                     merged[key] = if (previous == null) {
                         Triple(set, number, quantity)
@@ -132,7 +132,7 @@ class AiDeckClient(context: Context) {
 
                 val ownedByKey = holdings
                     .filter { it.quantity > 0 }
-                    .associateBy { "\${it.setCode.uppercase()}#\${it.number.toIntOrNull() ?: it.number}" }
+                    .associateBy { "${it.setCode.uppercase()}#${it.number.toIntOrNull() ?: it.number}" }
 
                 val cards = mutableListOf<DeckCard>()
                 for ((key, entry) in merged) {
@@ -141,9 +141,9 @@ class AiDeckClient(context: Context) {
                     val quantity = entry.third
                     val cc = catalog.find { it.set.equals(set, true) && it.number == number }
                         ?: return@withContext Result.failure(IllegalStateException("Carta inexistente: $key"))
-                    val ownedQty = ownedByKey["\${cc.set.uppercase()}#$number"]?.quantity ?: 0
+                    val ownedQty = ownedByKey["${cc.set.uppercase()}#$number"]?.quantity ?: 0
                     if (quantity > ownedQty) {
-                        return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de \${cc.name} de las disponibles."))
+                        return@withContext Result.failure(IllegalStateException("La propuesta usa más copias de ${cc.name} de las disponibles."))
                     }
                     cards += DeckCard(
                         set,
