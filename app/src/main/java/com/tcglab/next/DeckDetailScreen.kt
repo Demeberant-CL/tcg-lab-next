@@ -27,6 +27,18 @@ private val DetailSurface = Color(0xFF111823)
 private val DetailAccent = Color(0xFF58A6FF)
 private val DetailMuted = Color(0xFF8E9AAA)
 
+private fun energyName(id: Int): String = when (id) {
+    1 -> "Planta"
+    2 -> "Fuego"
+    3 -> "Agua"
+    4 -> "Rayo"
+    5 -> "Psíquica"
+    6 -> "Lucha"
+    7 -> "Oscura"
+    8 -> "Metal"
+    else -> "Desconocida"
+}
+
 @Composable
 fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDeleted: () -> Unit) {
     var showQr by remember { mutableStateOf(false) }
@@ -60,7 +72,15 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
             }
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item { Text("Energías: ${deck.energies.joinToString(" · ")}", style = MaterialTheme.typography.titleMedium) }
+            item {
+                Text("Energías", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    deck.energies.forEach { id ->
+                        AssistChip(onClick = {}, label = { Text(energyName(id)) })
+                    }
+                }
+            }
             item { Text("Cartas", style = MaterialTheme.typography.titleMedium) }
             items(deck.cards, key = { "${it.setCode}#${it.number}" }) { card ->
                 Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(DetailSurface)) {
