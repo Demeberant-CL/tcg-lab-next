@@ -504,7 +504,7 @@ private fun StrategyScreen(
     holdings: List<CollectionCard>,
     database: TcgDatabase,
     aiClient: AiDeckClient,
-    onDeckSaved: () -> Unit
+    onDeckSaved: (List<DeckSummary>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var key by remember { mutableStateOf("") }
@@ -551,10 +551,10 @@ private fun StrategyScreen(
                             scope.launch {
                                 aiClient.generate(holdings, Catalog.allCards(), goal)
                                     .onSuccess {
-                                        database.saveDeck(it.deck)
+                                        withContext(Dispatchers.IO) { database.saveDeck(it.deck) }
                                         explanation = it.explanation
                                         message = "Mazo guardado: ${it.deck.name}"
-                                        onDeckSaved()
+                                        onDeckSaved(withContext(Dispatchers.IO) { database.getDecks() })
                                     }
                                     .onFailure { message = it.message ?: "No se pudo generar el mazo." }
                                 busy = false
