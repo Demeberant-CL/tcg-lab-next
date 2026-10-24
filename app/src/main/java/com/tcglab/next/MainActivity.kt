@@ -327,7 +327,7 @@ private fun CollectionScreen(
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            .take(160)
+            .take(80)
             .toList()
     }
     Column(
@@ -361,7 +361,7 @@ private fun CollectionScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(visible, key = { "${it.set}#${it.number}" }) { card ->
+            items(visible, key = { "${it.set}:${it.number}:${it.entityId}" }) { card ->
                 val key = "${card.set}#${card.number}"
                 val quantity = holdingByKey[key]?.quantity ?: 0
                 Card(
@@ -371,13 +371,13 @@ private fun CollectionScreen(
                 ) {
                     Column {
                         Box(
-                            Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF0B111A)),
+                            Modifier.fillMaxWidth().height(165.dp).background(Color(0xFF0B111A)),
                             contentAlignment = Alignment.Center
                         ) {
                             AsyncImage(
                                 model = Catalog.imageUrl(card),
                                 contentDescription = card.name,
-                                modifier = Modifier.fillMaxSize().padding(6.dp),
+                                modifier = Modifier.fillMaxSize().padding(8.dp),
                                 contentScale = ContentScale.Fit
                             )
                             if (quantity > 0) {
