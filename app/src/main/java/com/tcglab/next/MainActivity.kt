@@ -368,6 +368,7 @@ private fun CollectionScreen(
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("Todas") }
+    var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
     val visible = remember(query, filter, catalog) {
@@ -412,7 +413,7 @@ private fun CollectionScreen(
                         val key = "${card.set}#${card.number}"
                         val quantity = holdingByKey[key]?.quantity ?: 0
                         Card(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).clickable { selectedCard = card },
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Surface)
                         ) {
@@ -471,6 +472,27 @@ private fun CollectionScreen(
                 }
             }
         }
+    }
+    selectedCard?.let { card ->
+        val quantity = holdingByKey["${card.set}#${card.number}"]?.quantity ?: 0
+        AlertDialog(
+            onDismissRequest = { selectedCard = null },
+            title = { Text(card.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AsyncImage(
+                        model = Catalog.imageUrl(card),
+                        contentDescription = card.name,
+                        modifier = Modifier.fillMaxWidth().height(260.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Text("${card.set} · #${card.number} · ${card.rarity}", color = Muted)
+                    Text(if (card.trainer) "Entrenador" else "Pokémon · ${card.element}", color = AccentSoft)
+                    Text("Cantidad registrada: ×$quantity", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            confirmButton = { TextButton(onClick = { selectedCard = null }) { Text("Cerrar") } }
+        )
     }
 }
 
