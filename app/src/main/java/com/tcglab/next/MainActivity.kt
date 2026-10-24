@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.tcglab.next.data.AiDeckClient
@@ -533,6 +535,8 @@ private fun StrategyScreen(
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var explanation by remember { mutableStateOf<String?>(null) }
+    var showKey by remember { mutableStateOf(false) }
+    val distinctHoldings = holdings.distinctBy { it.key }.size
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -558,8 +562,41 @@ private fun StrategyScreen(
                     }
                     Text("Grok analiza únicamente las cartas registradas y propone un mazo válido.", color = Color(0xFFD0D8E3))
                     if (!aiClient.hasKey()) {
-                        OutlinedTextField(value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Clave API de xAI") }, placeholder = { Text("xai-...") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                        OutlinedTextField(
+                            value = key,
+                            onValueChange = { key = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Clave API de xAI") },
+                            placeholder = { Text("xai-...") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { showKey = !showKey }) {
+                                    Icon(
+                                        if (showKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        if (showKey) "Ocultar clave" else "Mostrar clave"
+                                    )
+                                }
+                            }
+                        )
                         Text("La clave se guarda solo en este dispositivo.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (distinctHoldings < 10) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Surface
+                        ) {
+                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Info, null, tint = Accent)
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("Colección insuficiente", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                    Text("Registra al menos 10 cartas distintas para habilitar el análisis.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                     }
                     OutlinedTextField(value = goal, onValueChange = { goal = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Objetivo opcional") }, placeholder = { Text("Ej.: consistencia, agresividad, control...") }, minLines = 2, shape = RoundedCornerShape(14.dp))
                     Button(
