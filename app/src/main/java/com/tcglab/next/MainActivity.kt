@@ -365,11 +365,7 @@ private fun CollectionScreen(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Todas", "Pokémon", "Entrenadores").forEach { option ->
-                FilterChip(
-                    selected = filter == option,
-                    onClick = { filter = option },
-                    label = { Text(option) }
-                )
+                FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option) })
             }
         }
         LazyColumn(
@@ -380,58 +376,60 @@ private fun CollectionScreen(
             items(visible.chunked(2), key = { row -> row.joinToString("|") { "${it.set}:${it.number}:${it.entityId}" } }) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { card ->
-                val key = "${card.set}#${card.number}"
-                val quantity = holdingByKey[key]?.quantity ?: 0
-                Card(
-                    Modifier.weight(1f),
-                    RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(Surface)
-                ) {
-                    Column {
-                        Box(
-                            Modifier.fillMaxWidth().height(165.dp).background(Color(0xFF0B111A)),
-                            contentAlignment = Alignment.Center
+                        val key = "${card.set}#${card.number}"
+                        val quantity = holdingByKey[key]?.quantity ?: 0
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Surface)
                         ) {
-                            AsyncImage(
-                                model = Catalog.imageUrl(card),
-                                contentDescription = card.name,
-                                modifier = Modifier.fillMaxSize().padding(8.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            if (quantity > 0) {
-                                Surface(
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = Accent
+                            Column {
+                                Box(
+                                    Modifier.fillMaxWidth().height(165.dp).background(Color(0xFF0B111A)),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text("×$quantity", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                    AsyncImage(
+                                        model = Catalog.imageUrl(card),
+                                        contentDescription = card.name,
+                                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    if (quantity > 0) {
+                                        Surface(
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Accent
+                                        ) {
+                                            Text("×$quantity", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                        }
+                                    }
+                                }
+                                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(card.name, color = Color.White, maxLines = 2, fontWeight = FontWeight.SemiBold)
+                                    Text("${card.set} · ${card.number} · ${card.rarity}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        IconButton(onClick = {
+                                            if (quantity > 0) {
+                                                database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                onChanged()
+                                            }
+                                        }) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
+                                        Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) AccentSoft else Muted, style = MaterialTheme.typography.labelMedium)
+                                        IconButton(onClick = {
+                                            database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                            onChanged()
+                                        }) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
+                                    }
                                 }
                             }
                         }
-                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text(card.name, color = Color.White, maxLines = 2, fontWeight = FontWeight.SemiBold)
-                            Text("${card.set} · ${card.number} · ${card.rarity}", color = Muted, style = MaterialTheme.typography.labelSmall)
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                IconButton(onClick = {
-                                    if (quantity > 0) {
-                                        database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
-                                        onChanged()
-                                    }
-                                }) { Icon(Icons.Outlined.Remove, "Restar", tint = Muted) }
-                                Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) AccentSoft else Muted, style = MaterialTheme.typography.labelMedium)
-                                IconButton(onClick = {
-                                    database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
-                                    onChanged()
-                                }) { Icon(Icons.Outlined.Add, "Agregar", tint = Accent) }
-                            }
-                        }
                     }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
