@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -228,7 +229,7 @@ private fun HomeScreen(
                     Text("TCG LAB", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
                     Text("Laboratorio de estrategia", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 }
-                MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Outlined.Settings, "Ajustes", tint = MaterialTheme.colorScheme.secondary)
                     }
@@ -253,7 +254,7 @@ private fun HomeScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            MaterialTheme.colorScheme.surface(
+                            Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                             ) {
@@ -321,13 +322,13 @@ private fun HomeScreen(
             }
         }
         item {
-            MaterialTheme.colorScheme.surface(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                         Icon(Icons.Outlined.Insights, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(11.dp).size(24.dp))
                     }
                     Spacer(Modifier.width(14.dp))
@@ -382,7 +383,7 @@ private fun CollectionScreen(
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
-    LaunchedEffect(Unit) { wishlist = database.getWishlist() }
+    LaunchedEffect(Unit) { wishlist = withContext(Dispatchers.IO) { database.getWishlist() } }
     val ownedKeys = remember(holdings) { holdings.map { it.key }.toSet() }
     val visible = remember(query, filter, ownership, setFilter, showWishlistOnly, catalog, ownedKeys, wishlist) {
         val q = query.trim()
@@ -426,10 +427,24 @@ private fun CollectionScreen(
                 FilterChip(selected = ownership == option, onClick = { ownership = option }, label = { Text(option) })
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            FilterChip(selected = setFilter == "Todos", onClick = { setFilter = "Todos" }, label = { Text("Todos los sets") })
-            Catalog.allSets().take(6).forEach { s ->
-                FilterChip(selected = setFilter == s.code, onClick = { setFilter = s.code }, label = { Text(s.code) })
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(end = 8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = setFilter == "Todos",
+                    onClick = { setFilter = "Todos" },
+                    label = { Text("Todos los sets") }
+                )
+            }
+            items(Catalog.allSets(), key = { it.code }) { s ->
+                FilterChip(
+                    selected = setFilter == s.code,
+                    onClick = { setFilter = s.code },
+                    label = { Text(s.es) }
+                )
             }
         }
         FilterChip(
@@ -467,7 +482,7 @@ private fun CollectionScreen(
                                         contentScale = ContentScale.Fit
                                     )
                                     if (quantity > 0) {
-                                        MaterialTheme.colorScheme.surface(
+                                        Surface(
                                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                                             shape = RoundedCornerShape(10.dp),
                                             color = MaterialTheme.colorScheme.primary
@@ -574,7 +589,7 @@ private fun DecksScreen(modifier: Modifier, decks: List<DeckSummary>, onOpen: (L
                         colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
                     ) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                                 Icon(Icons.Outlined.GridView, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp))
                             }
                             Spacer(Modifier.width(12.dp))
@@ -627,7 +642,7 @@ private fun StrategyScreen(
             Card(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
                             Icon(Icons.Outlined.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
                         }
                         Spacer(Modifier.width(10.dp))
@@ -659,7 +674,7 @@ private fun StrategyScreen(
                         Text("La clave se guarda solo en este dispositivo.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                     if (distinctHoldings < 10) {
-                        MaterialTheme.colorScheme.surface(
+                        Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surface
@@ -714,7 +729,7 @@ private fun StrategyScreen(
                         Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             p.deck.cards.forEach { card ->
-                                MaterialTheme.colorScheme.surface(
+                                Surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
                                     color = MaterialTheme.colorScheme.surface
@@ -760,9 +775,9 @@ private fun StrategyScreen(
 
 @Composable
 private fun EmptyCard(title: String, text: String) {
-    MaterialTheme.colorScheme.surface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            MaterialTheme.colorScheme.surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                 Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
             }
             Spacer(Modifier.width(12.dp))
