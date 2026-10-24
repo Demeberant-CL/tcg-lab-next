@@ -52,13 +52,15 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     private val database: TcgDatabase get() = DatabaseHolder.db
     private val aiClient by lazy { AiDeckClient(applicationContext) }
+    private var darkTheme by mutableStateOf(true)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseHolder.init(applicationContext)
+        darkTheme = aiClient.isDarkTheme()
         enableEdgeToEdge()
         setContent {
-            TcgLabTheme(darkTheme = aiClient.isDarkTheme()) {
-                TcgLabNextApp(database, aiClient)
+            TcgLabTheme(darkTheme = darkTheme) {
+                TcgLabNextApp(database, aiClient, onThemeChanged = { darkTheme = it })
             }
         }
     }
@@ -66,7 +68,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
+private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient, onThemeChanged: (Boolean) -> Unit = {}) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
     var building by remember { mutableStateOf(false) }
@@ -132,6 +134,7 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     modifier = Modifier.padding(padding).fillMaxSize(),
                     aiClient = aiClient,
                     database = database,
+                    onThemeChanged = onThemeChanged,
                     onCollectionChanged = {
                         scope.launch(Dispatchers.IO) {
                             val updated = database.getCards()
@@ -871,6 +874,7 @@ private fun SettingsScreen(
     modifier: Modifier,
     aiClient: AiDeckClient,
     database: TcgDatabase,
+    onThemeChanged: (Boolean) -> Unit = {},
     onCollectionChanged: () -> Unit = {},
     onBack: () -> Unit
 ) {
@@ -950,7 +954,8 @@ private fun SettingsScreen(
             Switch(checked = dark, onCheckedChange = {
                 dark = it
                 aiClient.saveDarkTheme(it)
-                message = "Tema guardado. Reinicia la app para aplicarlo."
+                onThemeChanged(it)
+                message = "Tema guardado"
             })
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
