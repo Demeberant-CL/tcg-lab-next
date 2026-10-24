@@ -660,6 +660,23 @@ private fun StrategyScreen(
                         Text(p.deck.name, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text("Energías: ${p.deck.energies.joinToString(" · ")}", color = AccentSoft)
                         Text("Cartas: ${p.deck.cards.size} distintas · ${p.deck.totalCards} copias", color = Muted)
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            p.deck.cards.forEach { card ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Surface
+                                ) {
+                                    Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(card.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                            Text("${card.setCode} · #${card.number} · ${card.category}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        Text("×${card.quantity}", color = AccentSoft, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
                         Button(
                             onClick = {
                                 scope.launch {
