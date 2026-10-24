@@ -17,6 +17,7 @@ class AiDeckClient(context: Context) {
     private val prefs = context.getSharedPreferences("tcg_lab_ai", Context.MODE_PRIVATE)
     private val http = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(180, TimeUnit.SECONDS).build()
     fun hasKey(): Boolean = prefs.getString("xai_key", "").orEmpty().isNotBlank()
+    fun currentKey(): String? = prefs.getString("xai_key", null)?.takeIf { it.isNotBlank() }
     fun saveKey(key: String) { prefs.edit().putString("xai_key", key.trim()).apply() }
 
     suspend fun generate(holdings: List<CollectionCard>, catalog: List<CatalogCard>, goal: String): Result<AiDeckProposal> = withContext(Dispatchers.IO) {

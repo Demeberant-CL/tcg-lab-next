@@ -76,14 +76,16 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var selectedDeck by remember { mutableStateOf<Deck?>(null) }
     var building by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cards = remember { mutableStateOf(emptyList<CollectionCard>()) }
     val decks = remember { mutableStateOf(emptyList<DeckSummary>()) }
     val catalog = remember { mutableStateOf(emptyList<CatalogCard>()) }
 
-    BackHandler(enabled = selectedDeck != null || building || selected != 0) {
+    BackHandler(enabled = selectedDeck != null || building || showSettings || selected != 0) {
         when {
+            showSettings -> showSettings = false
             building -> building = false
             selectedDeck != null -> selectedDeck = null
             else -> selected = 0
@@ -150,7 +152,13 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                 }
             }
         ) { padding ->
-            if (loading) {
+            if (showSettings) {
+                SettingsScreen(
+                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    aiClient = aiClient,
+                    onBack = { showSettings = false }
+                )
+            } else if (loading) {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Accent)
                 }
@@ -161,7 +169,8 @@ private fun TcgLabNextApp(database: TcgDatabase, aiClient: AiDeckClient) {
                     decks.value.size,
                     onCollection = { selected = 1 },
                     onStrategy = { selected = 3 },
-                    onDecks = { selected = 2 }
+                    onDecks = { selected = 2 },
+                    onSettings = { showSettings = true }
                 )
                 1 -> CollectionScreen(
                     Modifier.padding(padding),
@@ -227,9 +236,9 @@ private fun HomeScreen(
     deckCount: Int,
     onCollection: () -> Unit,
     onStrategy: () -> Unit,
-    onDecks: () -> Unit
+    onDecks: () -> Unit,
+    onSettings: () -> Unit = {}
 ) {
-    var showSettings by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 28.dp),
@@ -242,7 +251,7 @@ private fun HomeScreen(
                     Text("Laboratorio de estrategia", color = Muted, style = MaterialTheme.typography.bodyLarge)
                 }
                 Surface(shape = RoundedCornerShape(16.dp), color = SurfaceRaised) {
-                    IconButton(onClick = { showSettings = true }) {
+                    IconButton(onClick = onSettings) {
                         Icon(Icons.Outlined.Settings, "Ajustes", tint = AccentSoft)
                     }
                 }
@@ -352,19 +361,6 @@ private fun HomeScreen(
                 }
             }
         }
-    }
-    if (showSettings) {
-        AlertDialog(
-            onDismissRequest = { showSettings = false },
-            title = { Text("Ajustes") },
-            text = { Text("La configuración de la inteligencia artificial se gestiona desde Estrategia.") },
-            confirmButton = {
-                TextButton(onClick = { showSettings = false; onStrategy() }) { Text("Configurar IA") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSettings = false }) { Text("Cerrar") }
-            }
-        )
     }
 }
 
@@ -850,6 +846,51 @@ private fun DeckBuilderScreen(
             enabled = total == 20 && energies.size in 1..3,
             modifier = Modifier.fillMaxWidth()
         ) { Text("Guardar mazo") }
+    }
+}
+
+
+@Composable
+private fun SettingsScreen(
+    modifier: Modifier,
+    aiClient: AiDeckClient,
+    onBack: () -> Unit
+) {
+    var key by remember { mutableStateOf(aiClient.currentKey() ?: "") }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Atrás") }
+            Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+        Text("Clave de xAI (Grok)", color = Color.White, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(
+            value = key,
+            onValueChange = { key = it },
+            label = { Text("xai-...") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                aiClient.saveKey(key.trim())
+                message = if (aiClient.hasKey()) "Clave guardada" else "Clave vacía"
+            }) { Text("Guardar") }
+            OutlinedButton(onClick = {
+                aiClient.saveKey("")
+                key = ""
+                message = "Clave eliminada"
+            }) { Text("Borrar") }
+        }
+        message?.let { Text(it, color = AccentSoft) }
+        Text("La clave se guarda localmente y solo se usa para generar mazos con IA.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(color = Divider)
+        Text("Versión", color = Color.White, fontWeight = FontWeight.SemiBold)
+        Text("TCG LAB NEXT · en desarrollo", color = Muted)
+        Text("App fan no oficial. Pokémon es marca de Nintendo / Creatures / GAME FREAK.", color = Muted, style = MaterialTheme.typography.bodySmall)
     }
 }
 
