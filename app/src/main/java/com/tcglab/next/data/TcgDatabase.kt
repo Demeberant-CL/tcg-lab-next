@@ -42,8 +42,11 @@ data class Deck(
     val isValid: Boolean
         get() = totalCards == 20 &&
             energies.size in 1..3 &&
-            cards.all { it.quantity > 0 } &&
-            cards.groupBy { it.name }.values.all { group -> group.sumOf { it.quantity } <= 2 }
+            energies.distinct().size == energies.size &&
+            energies.all { it in 1..8 } &&
+            cards.all { it.quantity > 0 && it.entityId != 0 } &&
+            cards.groupBy { it.name }.values.all { group -> group.sumOf { it.quantity } <= 2 } &&
+            cards.groupBy { it.entityId }.values.all { group -> group.sumOf { it.quantity } <= 2 }
 }
 
 class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", null, 2) {
@@ -116,6 +119,10 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
         }
 
     fun saveCard(card: CollectionCard) {
+        if (card.quantity <= 0) {
+            deleteCard(card.key)
+            return
+        }
         writableDatabase.execSQL(
             "INSERT OR REPLACE INTO collection_cards(key,name,set_code,number,quantity,image_url,category) VALUES(?,?,?,?,?,?,?)",
             arrayOf(card.key, card.name, card.setCode, card.number, card.quantity, card.imageUrl, card.category)
@@ -172,7 +179,7 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
 
     fun saveDeck(deck: Deck): Long {
         require(deck.name.isNotBlank()) { "El mazo necesita un nombre." }
-        require(deck.isValid) { "El mazo debe tener exactamente 20 cartas, 1 a 3 energías y máximo 2 copias por nombre." }
+        require(deck.isValid) { "El mazo debe tener 20 cartas, 1 a 3 energías válidas y máximo 2 copias por carta." }
         val db = writableDatabase
         db.beginTransaction()
         try {
