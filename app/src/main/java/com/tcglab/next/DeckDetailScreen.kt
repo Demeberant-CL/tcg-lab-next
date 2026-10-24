@@ -82,13 +82,24 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
                 }
             }
             item { Text("Cartas", style = MaterialTheme.typography.titleMedium) }
-            items(deck.cards, key = { "${it.setCode}#${it.number}" }) { card ->
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(DetailSurface)) {
-                    Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(model = card.imageUrl, contentDescription = card.name, modifier = Modifier.size(58.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) { Text(card.name); Text("${card.setCode} · ${card.number} · ${card.category}", color = DetailMuted, style = MaterialTheme.typography.labelSmall) }
-                        Text("×${card.quantity}", style = MaterialTheme.typography.titleMedium)
+            listOf("Pokémon", "Entrenadores").forEach { category ->
+                val section = deck.cards.filter { it.category == category }
+                if (section.isNotEmpty()) {
+                    item {
+                        Text(category, color = DetailAccent, style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
+                    items(section, key = { "${it.setCode}#${it.number}" }) { card ->
+                        Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(DetailSurface)) {
+                            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(model = card.imageUrl, contentDescription = card.name, modifier = Modifier.size(58.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(card.name)
+                                    Text("${card.setCode} · #${card.number}", color = DetailMuted, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Text("×${card.quantity}", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
                     }
                 }
             }
