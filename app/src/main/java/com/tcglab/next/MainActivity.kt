@@ -406,11 +406,14 @@ private fun CollectionScreen(
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var ownership by rememberSaveable { mutableStateOf("Todas") }
     var setFilter by rememberSaveable { mutableStateOf("Todos") }
+    var showWishlistOnly by rememberSaveable { mutableStateOf(false) }
+    var wishlist by remember { mutableStateOf(emptySet<String>()) }
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     val scope = rememberCoroutineScope()
     val holdingByKey = remember(holdings) { holdings.associateBy { it.key } }
+    LaunchedEffect(Unit) { wishlist = database.getWishlist() }
     val ownedKeys = remember(holdings) { holdings.map { it.key }.toSet() }
-    val visible = remember(query, filter, ownership, setFilter, catalog, ownedKeys) {
+    val visible = remember(query, filter, ownership, setFilter, showWishlistOnly, catalog, ownedKeys, wishlist) {
         val q = query.trim()
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
@@ -420,6 +423,7 @@ private fun CollectionScreen(
                 val key = "${it.set}#${it.number}"
                 ownership == "Todas" || (ownership == "Tengo" && key in ownedKeys) || (ownership == "Me faltan" && key !in ownedKeys)
             }
+            .filter { !showWishlistOnly || "${it.set}#${it.number}" in wishlist }
             .toList()
     }
     val uniqueOwned = holdings.distinctBy { it.key }.size
@@ -456,6 +460,11 @@ private fun CollectionScreen(
                 FilterChip(selected = setFilter == s.code, onClick = { setFilter = s.code }, label = { Text(s.code) })
             }
         }
+        FilterChip(
+            selected = showWishlistOnly,
+            onClick = { showWishlistOnly = !showWishlistOnly },
+            label = { Text(if (showWishlistOnly) "Solo deseadas" else "Mostrar deseadas") }
+        )
         if (visible.isEmpty()) {
             EmptyCard("Sin resultados", "Prueba con otro nombre, ID o cambia el filtro.")
         }
@@ -543,6 +552,17 @@ private fun CollectionScreen(
                     Text("${card.set} · #${card.number} · ${card.rarity}", color = Muted)
                     Text(if (card.trainer) "Entrenador" else "Pokémon · ${card.element}", color = AccentSoft)
                     Text("Cantidad registrada: ×$quantity", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    val key = "${card.set}#${card.number}"
+                    val wished = key in wishlist
+                    TextButton(onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            database.toggleWishlist(key)
+                            val updated = database.getWishlist()
+                            withContext(Dispatchers.Main) { wishlist = updated }
+                        }
+                    }) {
+                        Text(if (wished) "Quitar de deseados" else "Añadir a deseados")
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = { selectedCard = null }) { Text("Cerrar") } }

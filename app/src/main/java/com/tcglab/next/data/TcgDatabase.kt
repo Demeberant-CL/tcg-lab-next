@@ -55,6 +55,9 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
                 quantity INTEGER NOT NULL,
                 image_url TEXT NOT NULL,
                 category TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS wishlist (
+                key TEXT PRIMARY KEY NOT NULL
             )
         """.trimIndent())
         createDeckTables(db)
