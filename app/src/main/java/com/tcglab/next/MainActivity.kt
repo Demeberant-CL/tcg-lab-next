@@ -301,8 +301,6 @@ private fun HomeScreen(
                         Text("Registra cartas o crea un mazo con IA para comenzar.", color = Muted)
                     }
                 }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
             }
         }
     }
@@ -433,6 +431,7 @@ private fun CollectionScreen(
                         }
                     }
                 }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
