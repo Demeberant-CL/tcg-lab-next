@@ -39,17 +39,10 @@ data class Deck(
     val energies: List<Int>
 ) {
     val totalCards: Int get() = cards.sumOf { it.quantity }
-    val isValid: Boolean
-        get() = totalCards == 20 &&
-            energies.size in 1..3 &&
-            energies.distinct().size == energies.size &&
-            energies.all { it in 1..8 } &&
-            cards.all { it.quantity > 0 && it.entityId != 0 } &&
-            cards.groupBy { it.name }.values.all { group -> group.sumOf { it.quantity } <= 2 } &&
-            cards.groupBy { it.entityId }.values.all { group -> group.sumOf { it.quantity } <= 2 }
+    val isValid: Boolean get() = com.tcglab.next.domain.DeckRules.isValid(this)
 }
 
-class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", null, 2) {
+class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE collection_cards (
@@ -65,8 +58,14 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
         createDeckTables(db)
     }
 
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createDeckTables(db)
+        // v3: entityId rule removed; no schema change required for that
     }
 
     private fun createDeckTables(db: SQLiteDatabase) {
@@ -132,6 +131,22 @@ class TcgDatabase(context: Context) : SQLiteOpenHelper(context, "tcg_lab.db", nu
     fun deleteCard(key: String) {
         writableDatabase.delete("collection_cards", "key = ?", arrayOf(key))
     }
+
+    fun incrementCard(card: CollectionCard) {
+        writableDatabase.execSQL(
+            """INSERT INTO collection_cards(key,name,set_code,number,quantity,image_url,category)
+               VALUES(?,?,?,?,1,?,?)
+               ON CONFLICT(key) DO UPDATE SET quantity = MIN(quantity + 1, 99)""",
+            arrayOf(card.key, card.name, card.setCode, card.number, card.imageUrl, card.category)
+        )
+    }
+
+    fun decrementCard(key: String) {
+        val db = writableDatabase
+        db.execSQL("UPDATE collection_cards SET quantity = quantity - 1 WHERE key = ?", arrayOf(key))
+        db.execSQL("DELETE FROM collection_cards WHERE key = ? AND quantity <= 0", arrayOf(key))
+    }
+
 
     fun getDecks(): List<DeckSummary> {
         val result = mutableListOf<DeckSummary>()

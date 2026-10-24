@@ -52,13 +52,13 @@ private val Muted = Color(0xFF9BA8B8)
 private val Divider = Color(0xFF263446)
 
 class MainActivity : ComponentActivity() {
-    private lateinit var database: TcgDatabase
+    private val database: TcgDatabase get() = DatabaseHolder.db
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        database = TcgDatabase(this)
+        DatabaseHolder.init(applicationContext)
         setContent { TcgLabNextApp(database, AiDeckClient(this)) }
     }
-    override fun onDestroy() { database.close(); super.onDestroy() }
+    // Database is a process singleton; do not close it here.
 }
 
 @Composable
@@ -376,7 +376,7 @@ private fun CollectionScreen(
         catalog.asSequence()
             .filter { filter == "Todas" || (filter == "Entrenadores" && it.trainer) || (filter == "Pokémon" && !it.trainer) }
             .filter { q.isBlank() || it.name.contains(q, ignoreCase = true) || "${it.set} ${it.number}".contains(q, ignoreCase = true) }
-            .take(40)
+            
             .toList()
     }
     Column(
@@ -449,7 +449,7 @@ private fun CollectionScreen(
                                         IconButton(onClick = {
                                             if (quantity > 0) {
                                                 scope.launch(Dispatchers.IO) {
-                                                    database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity - 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                    database.decrementCard(key)
                                                     val updated = database.getCards()
                                                     withContext(Dispatchers.Main) { onChanged(updated) }
                                                 }
@@ -458,7 +458,7 @@ private fun CollectionScreen(
                                         Text(if (quantity > 0) "En colección" else "No registrada", color = if (quantity > 0) AccentSoft else Muted, style = MaterialTheme.typography.labelMedium)
                                         IconButton(onClick = {
                                             scope.launch(Dispatchers.IO) {
-                                                database.saveCard(CollectionCard(key, card.name, card.set, card.number.toString(), quantity + 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
+                                                database.incrementCard(CollectionCard(key, card.name, card.set, card.number.toString(), 1, Catalog.imageUrl(card), if (card.trainer) "Entrenadores" else "Pokémon"))
                                                 val updated = database.getCards()
                                                 withContext(Dispatchers.Main) { onChanged(updated) }
                                             }
@@ -719,5 +719,14 @@ private fun EmptyCard(title: String, text: String) {
                 Text(text, color = Muted)
             }
         }
+    }
+}
+
+
+object DatabaseHolder {
+    lateinit var db: TcgDatabase
+        private set
+    fun init(context: android.content.Context) {
+        if (!::db.isInitialized) db = TcgDatabase(context.applicationContext)
     }
 }
