@@ -1,32 +1,35 @@
 package com.tcglab.next.domain
 
-import com.tcglab.next.data.Deck
 import com.tcglab.next.data.DeckCard
 import java.text.Normalizer
 import java.util.Locale
 
 object DeckRules {
-    fun isValid(deck: Deck): Boolean = validate(deck).isEmpty()
+    const val MIN_ENERGIES = 1
+    const val MAX_ENERGIES = 3
+    const val MAX_COPIES_PER_NAME = 2
+    const val DECK_SIZE = 20
 
-    fun validate(deck: Deck): List<String> {
-        val errors = mutableListOf<String>()
-        val total = deck.cards.sumOf { it.quantity }
-        if (total != 20) errors += "Debe tener exactamente 20 cartas (tiene $total)."
-        if (deck.energies.size !in 1..3) errors += "Debe tener entre 1 y 3 energías."
-        if (deck.energies.distinct().size != deck.energies.size) errors += "Las energías no pueden repetirse."
-        if (deck.energies.any { it !in 1..8 }) errors += "Energía no válida."
-        if (deck.cards.any { it.quantity <= 0 }) errors += "Cantidad de carta inválida."
-
-        val byName = deck.cards.groupBy { normalize(it.name) }
-        byName.forEach { (name, group) ->
-            val copies = group.sumOf { it.quantity }
-            if (copies > 2) errors += "Más de 2 copias de \"$name\" ($copies)."
-        }
-        return errors
-    }
-
-    fun normalize(name: String): String =
+    fun normalizeName(name: String): String =
         Normalizer.normalize(name.trim().lowercase(Locale.ROOT), Normalizer.Form.NFD)
             .replace("\\p{M}+".toRegex(), "")
-            .trim()
+            .replace("\\s+".toRegex(), " ")
+
+    fun validate(cards: List<DeckCard>, energies: List<Int>, basicCardNames: Set<String> = emptySet()): List<String> {
+        val errors = mutableListOf<String>()
+        if (cards.sumOf { it.quantity } != DECK_SIZE) errors += "El mazo debe tener exactamente 20 cartas."
+        if (cards.any { it.quantity <= 0 }) errors += "Todas las cartas deben tener una cantidad positiva."
+        val copiesByName = cards.groupingBy { normalizeName(it.name) }.fold(0) { acc, card -> acc + card.quantity }
+        if (copiesByName.values.any { it > MAX_COPIES_PER_NAME }) errors += "No puedes usar más de 2 copias del mismo nombre."
+        if (energies.size !in MIN_ENERGIES..MAX_ENERGIES) errors += "El mazo debe usar entre 1 y 3 energías distintas."
+        if (energies.distinct().size != energies.size || energies.any { it !in 1..8 }) errors += "Las energías deben ser distintas y estar entre 1 y 8."
+        if (basicCardNames.isNotEmpty()) {
+            val hasBasic = cards.any { !it.category.equals("Entrenadores", true) && basicCardNames.contains(normalizeName(it.name)) && it.quantity > 0 }
+            if (!hasBasic) errors += "El mazo debe contener al menos 1 Pokémon Básico."
+        }
+        return errors.distinct()
+    }
+
+    fun isValid(cards: List<DeckCard>, energies: List<Int>, basicCardNames: Set<String> = emptySet()): Boolean =
+        validate(cards, energies, basicCardNames).isEmpty()
 }
