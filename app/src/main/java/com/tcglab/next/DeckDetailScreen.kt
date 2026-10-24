@@ -10,6 +10,9 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -28,7 +31,11 @@ private val DetailMuted = Color(0xFF8E9AAA)
 fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDeleted: () -> Unit) {
     var showQr by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val qr = remember(deck) { DeckQr.encode(deck, 560) }
+    var qr by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(deck, showQr) {
+        qr = if (showQr) withContext(Dispatchers.Default) { DeckQr.encode(deck, 560) } else null
+    }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Volver") }
@@ -45,7 +52,9 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
         if (showQr) {
             Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(DetailSurface)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(qr.asImageBitmap(), contentDescription = "QR del mazo", modifier = Modifier.size(280.dp))
+                    qr?.let {
+                        Image(it.asImageBitmap(), contentDescription = "QR del mazo", modifier = Modifier.size(280.dp))
+                    } ?: CircularProgressIndicator(color = DetailAccent)
                     Text("Código del mazo", style = MaterialTheme.typography.titleMedium)
                 }
             }
@@ -65,5 +74,13 @@ fun DeckDetailScreen(deck: Deck, database: TcgDatabase, onBack: () -> Unit, onDe
             }
         }
     }
-    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Eliminar mazo") }, text = { Text("Se eliminará este mazo de forma permanente.") }, confirmButton = { TextButton(onClick = { database.deleteDeck(deck.id); confirmDelete = false; onDeleted() }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
+    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Eliminar mazo") }, text = { Text("Se eliminará este mazo de forma permanente.") }, confirmButton = { TextButton(onClick = {
+            scope.launch(Dispatchers.IO) {
+                database.deleteDeck(deck.id)
+                withContext(Dispatchers.Main) {
+                    confirmDelete = false
+                    onDeleted()
+                }
+            }
+        }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
 }
