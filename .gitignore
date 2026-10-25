@@ -26,3 +26,14 @@ Thumbs.db
 
 # Misc
 *.log
+
+# Web
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+
+# Capacitor (se genera en CI)
+android/
+capacitor.config.*

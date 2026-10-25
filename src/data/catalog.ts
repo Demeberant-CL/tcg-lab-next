@@ -4,14 +4,42 @@ import { CardImages } from './cardImages';
 let loaded = false;
 let sets: CatalogSet[] = [];
 let cards: CatalogCard[] = [];
+let byKey = new Map<string, CatalogCard>();
 let loadPromise: Promise<void> | null = null;
 
-function fold(value: string): string {
+export function fold(value: string): string {
   return value
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim();
+}
+
+export function cardKey(set: string, number: number | string): string {
+  return `${set}#${number}`;
+}
+
+/**
+ * Las ilustraciones alternativas (AR) vienen sin elemento en los datos.
+ * Se completa con el elemento de otra impresión del mismo Pokémon.
+ */
+function fillMissingElements(list: CatalogCard[]): void {
+  const elementByName = new Map<string, string>();
+  for (const c of list) {
+    if (!c.trainer && c.element) elementByName.set(c.name, c.element);
+  }
+  for (const c of list) {
+    if (!c.trainer && !c.element) {
+      const inferred = elementByName.get(c.name);
+      if (inferred) c.element = inferred;
+    }
+  }
+}
+
+async function fetchJson<T>(file: string): Promise<T> {
+  const res = await fetch(`${import.meta.env.BASE_URL}${file}`);
+  if (!res.ok) throw new Error('No se pudieron cargar los datos de cartas.');
+  return (await res.json()) as T;
 }
 
 export const Catalog = {
@@ -21,20 +49,19 @@ export const Catalog = {
 
     loadPromise = (async () => {
       try {
-        const [setsRes, cardsRes] = await Promise.all([
-          fetch('/sets.json'),
-          fetch('/cards.json'),
+        const [setsData, cardsData] = await Promise.all([
+          fetchJson<CatalogSet[]>('sets.json'),
+          fetchJson<CatalogCard[]>('cards.json'),
         ]);
-
-        if (!setsRes.ok || !cardsRes.ok) {
-          throw new Error('No se pudieron cargar los datos de cartas.');
-        }
-
-        sets = await setsRes.json();
-        cards = await cardsRes.json();
+        fillMissingElements(cardsData);
+        sets = setsData;
+        cards = cardsData;
+        byKey = new Map(cards.map((c) => [cardKey(c.set, c.number), c]));
         loaded = true;
       } catch (err) {
         console.error('Error cargando catálogo:', err);
+        // Permite reintentar sin recargar la página.
+        loadPromise = null;
         throw err;
       }
     })();
@@ -54,31 +81,15 @@ export const Catalog = {
     return sets;
   },
 
-  imageUrl(card: { set: string; number: number | string }): string {
-    return CardImages.primaryUrl(card.set, card.number);
+  find(set: string, number: number | string): CatalogCard | undefined {
+    const direct = byKey.get(cardKey(set, Number(number)));
+    if (direct) return direct;
+    // Los códigos de set podrían llegar con otra capitalización.
+    const lower = set.toLowerCase();
+    return cards.find((c) => c.set.toLowerCase() === lower && c.number === Number(number));
   },
 
-  search(query: string, set?: string | null, limit = 80): CatalogCard[] {
-    const q = fold(query);
-    if (!q) return [];
-
-    const scored = cards
-      .filter((card) => !set || card.set.toLowerCase() === set.toLowerCase())
-      .map((card) => {
-        const name = fold(card.name);
-        const id = fold(`${card.set} ${card.number}`);
-        let score = 0;
-        if (name === q) score = 100;
-        else if (name.startsWith(q)) score = 80;
-        else if (name.includes(q)) score = 50;
-        else if (id.includes(q)) score = 40;
-        return { card, score };
-      })
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((item) => item.card);
-
-    return scored;
+  imageUrl(card: { set: string; number: number | string }): string {
+    return CardImages.primaryUrl(card.set, card.number);
   },
 };

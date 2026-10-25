@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CatalogCard, CatalogSet, CollectionCard, Deck, DeckSummary } from './types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CatalogCard, CatalogSet, CollectionCard, DeckSummary } from './types';
 import { Catalog } from './data/catalog';
 import { db } from './data/database';
 import { AiDeckClient } from './data/aiDeckClient';
@@ -26,60 +26,78 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [buildingDeck, setBuildingDeck] = useState<boolean>(false);
   const [selectedDeckId, setSelectedDeckId] = useState<number | null>(null);
-  const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
 
   // Theme state
   const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => AiDeckClient.isDarkTheme());
 
-  // Synchronize HTML dark/light class
+  // El mazo abierto se deriva del id, sin estado duplicado. `decks` cambia al
+  // guardar o borrar, por lo que también refresca el detalle.
+  const selectedDeck = useMemo(
+    () => (selectedDeckId !== null ? db.getDeck(selectedDeckId) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDeckId, decks]
+  );
+
+  // Si el mazo ya no existe, no se queda una pantalla vacía sin barra de navegación.
+  const inSubScreen = showSettings || buildingDeck || selectedDeck !== null;
+
+  // Synchronize HTML dark/light class and the browser UI color
   useEffect(() => {
     const root = document.documentElement;
-    if (isDarkTheme) {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.remove('dark');
-      root.classList.add('light');
-    }
+    root.classList.toggle('dark', isDarkTheme);
+    root.classList.toggle('light', !isDarkTheme);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', isDarkTheme ? '#070B12' : '#F3F6FB');
   }, [isDarkTheme]);
 
-  // Load catalog and initial database state
-  useEffect(() => {
-    const initData = async () => {
-      try {
-        setLoading(true);
-        await Catalog.load();
-        setCatalog(Catalog.allCards());
-        setSets(Catalog.allSets());
-
-        // Load collection & decks from db
-        const cards = db.getCards();
-        setCollection(cards);
-        const deckSummaries = db.getDecks();
-        setDecks(deckSummaries);
-      } catch (err) {
-        setError((err as Error).message || 'Error cargando datos del laboratorio.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initData();
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await Catalog.load();
+      setCatalog(Catalog.allCards());
+      setSets(Catalog.allSets());
+      setCollection(db.getCards());
+      setDecks(db.getDecks());
+    } catch (err) {
+      setError((err as Error).message || 'Error cargando datos del laboratorio.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Sync selected deck when ID changes
   useEffect(() => {
-    if (selectedDeckId) {
-      const d = db.getDeck(selectedDeckId);
-      setSelectedDeck(d);
-    } else {
-      setSelectedDeck(null);
-    }
-  }, [selectedDeckId]);
+    loadData();
+  }, [loadData]);
 
-  const refreshDecks = () => {
-    setDecks(db.getDecks());
+  // --- Navegación con el botón "Atrás" del dispositivo ---
+  // Cada subpantalla añade una entrada al historial; "Atrás" la cierra en vez de salir de la app.
+  const resetSubScreens = useCallback(() => {
+    setShowSettings(false);
+    setBuildingDeck(false);
+    setSelectedDeckId(null);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('popstate', resetSubScreens);
+    return () => window.removeEventListener('popstate', resetSubScreens);
+  }, [resetSubScreens]);
+
+  const openSubScreen = (open: () => void) => {
+    window.history.pushState({ sub: true }, '');
+    open();
   };
+
+  const closeSubScreen = () => {
+    if (window.history.state?.sub) {
+      window.history.back(); // dispara popstate -> resetSubScreens
+    } else {
+      resetSubScreens();
+    }
+  };
+
+  const refreshDecks = () => setDecks(db.getDecks());
 
   const refreshCollection = () => {
     setCollection(db.getCards());
@@ -93,24 +111,24 @@ export const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#070B12] flex flex-col items-center justify-center gap-3 text-white">
-        <div className="p-3.5 rounded-2xl bg-[#162335] text-[#62A9FF] animate-pulse">
+      <div className="min-h-screen bg-[color:var(--bg-color)] flex flex-col items-center justify-center gap-3 text-[color:var(--fg-color)]">
+        <div className="p-3.5 rounded-2xl bg-[color:var(--surface-raised)] text-[color:var(--accent-color)] animate-pulse">
           <Sparkles className="w-8 h-8" />
         </div>
-        <p className="text-sm font-bold text-[#9CC9FF]">Cargando TCG LAB...</p>
-        <p className="text-xs text-[#9BA8B8]">Inicializando catálogo de Pokémon TCG Pocket</p>
+        <p className="text-sm font-bold text-[color:var(--accent-soft)]">Cargando TCG LAB...</p>
+        <p className="text-xs text-[color:var(--muted-color)]">Inicializando catálogo de Pokémon TCG Pocket</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#070B12] flex flex-col items-center justify-center p-6 text-center text-white">
+      <div className="min-h-screen bg-[color:var(--bg-color)] flex flex-col items-center justify-center p-6 text-center text-[color:var(--fg-color)]">
         <p className="text-sm font-bold text-rose-400 mb-2">Error de inicialización</p>
-        <p className="text-xs text-[#9BA8B8] max-w-sm mb-4">{error}</p>
+        <p className="text-xs text-[color:var(--muted-color)] max-w-sm mb-4">{error}</p>
         <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 rounded-xl bg-[#62A9FF] text-slate-950 font-bold text-xs"
+          onClick={loadData}
+          className="px-4 py-2 rounded-xl bg-[color:var(--accent-color)] text-[color:var(--on-accent)] font-bold text-xs"
         >
           Reintentar
         </button>
@@ -119,35 +137,30 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#070B12] text-white flex flex-col">
-      {/* Top Main View Routing */}
+    <div className="min-h-screen bg-[color:var(--bg-color)] text-[color:var(--fg-color)] flex flex-col">
       <main className="flex-1">
         {showSettings ? (
           <SettingsScreen
             isDarkTheme={isDarkTheme}
             onThemeChanged={handleThemeChange}
             onCollectionChanged={refreshCollection}
-            onBack={() => setShowSettings(false)}
+            onBack={closeSubScreen}
           />
         ) : buildingDeck ? (
           <DeckBuilderScreen
             holdings={collection}
             onSaved={() => {
-              setBuildingDeck(false);
+              closeSubScreen();
               refreshDecks();
             }}
-            onCancel={() => setBuildingDeck(false)}
+            onCancel={closeSubScreen}
           />
-        ) : selectedDeckId && selectedDeck ? (
+        ) : selectedDeck ? (
           <DeckDetailScreen
             deck={selectedDeck}
-            onBack={() => {
-              setSelectedDeckId(null);
-              setSelectedDeck(null);
-            }}
+            onBack={closeSubScreen}
             onDeleted={() => {
-              setSelectedDeckId(null);
-              setSelectedDeck(null);
+              closeSubScreen();
               refreshDecks();
             }}
           />
@@ -161,7 +174,7 @@ export const App: React.FC = () => {
                 onCollection={() => setCurrentTab(1)}
                 onStrategy={() => setCurrentTab(3)}
                 onDecks={() => setCurrentTab(2)}
-                onSettings={() => setShowSettings(true)}
+                onSettings={() => openSubScreen(() => setShowSettings(true))}
               />
             )}
 
@@ -170,18 +183,15 @@ export const App: React.FC = () => {
                 catalog={catalog}
                 sets={sets}
                 holdings={collection}
-                onHoldingsChanged={(updated) => {
-                  setCollection(updated);
-                  refreshDecks();
-                }}
+                onHoldingsChanged={setCollection}
               />
             )}
 
             {currentTab === 2 && (
               <DecksScreen
                 decks={decks}
-                onOpenDeck={(id) => setSelectedDeckId(id)}
-                onNewDeck={() => setBuildingDeck(true)}
+                onOpenDeck={(id) => openSubScreen(() => setSelectedDeckId(id))}
+                onNewDeck={() => openSubScreen(() => setBuildingDeck(true))}
                 onStrategy={() => setCurrentTab(3)}
               />
             )}
@@ -189,7 +199,6 @@ export const App: React.FC = () => {
             {currentTab === 3 && (
               <StrategyScreen
                 holdings={collection}
-                catalog={catalog}
                 onDeckSaved={() => {
                   refreshDecks();
                   setCurrentTab(2);
@@ -201,18 +210,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Persistent Bottom Bar (hidden in full-screen sub-screens) */}
-      {!showSettings && !buildingDeck && !selectedDeckId && (
-        <Navbar
-          currentTab={currentTab}
-          onTabChange={(tab) => {
-            setCurrentTab(tab);
-            setSelectedDeckId(null);
-            setSelectedDeck(null);
-            setBuildingDeck(false);
-            setShowSettings(false);
-          }}
-        />
-      )}
+      {!inSubScreen && <Navbar currentTab={currentTab} onTabChange={setCurrentTab} />}
     </div>
   );
 };

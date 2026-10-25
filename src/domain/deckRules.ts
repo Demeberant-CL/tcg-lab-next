@@ -19,6 +19,16 @@ export const DeckRules = {
       .replace(/\s+/g, ' ');
   },
 
+  /** Copias por nombre normalizado (distintas impresiones de una carta cuentan juntas). */
+  copiesByName(cards: Pick<DeckCard, 'name' | 'quantity'>[]): Map<string, number> {
+    const copies = new Map<string, number>();
+    for (const card of cards) {
+      const norm = this.normalizeName(card.name);
+      copies.set(norm, (copies.get(norm) || 0) + card.quantity);
+    }
+    return copies;
+  },
+
   validate(cards: DeckCard[], energies: number[], basicCardNames: Set<string> = new Set()): string[] {
     const errors: string[] = [];
     const totalCards = cards.reduce((acc, c) => acc + c.quantity, 0);
