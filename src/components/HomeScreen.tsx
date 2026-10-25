@@ -26,15 +26,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-3xl font-black tracking-tight text-[color:var(--fg-color)] flex items-center gap-2">
             TCG LAB
           </h1>
-          <p className="text-sm text-[#9BA8B8] font-medium">Laboratorio de estrategia</p>
+          <p className="text-sm text-[color:var(--muted-color)] font-medium">Laboratorio de estrategia</p>
         </div>
         <button
           onClick={onSettings}
           title="Ajustes"
-          className="p-3 rounded-2xl bg-[#162335] text-[#9CC9FF] hover:bg-[#20314a] transition cursor-pointer"
+          className="p-3 rounded-2xl bg-[color:var(--surface-raised)] text-[color:var(--accent-soft)] hover:bg-[color:var(--raised-hover)] transition cursor-pointer"
         >
           <Settings className="w-5 h-5" />
         </button>
@@ -77,40 +77,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={onCollection}
-          className="p-4 rounded-2xl bg-[#101722] border border-[#263446] hover:border-[#62A9FF]/50 transition text-left flex flex-col gap-2 cursor-pointer shadow-sm"
+          className="p-4 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] hover:border-[color:var(--accent-color)]/50 transition text-left flex flex-col gap-2 cursor-pointer shadow-sm"
         >
-          <Bookmark className="w-6 h-6 text-[#62A9FF]" />
-          <span className="text-xs font-bold uppercase text-[#9BA8B8]">CARTAS</span>
-          <span className="text-2xl font-black text-white">{cardCount}</span>
-          <span className="text-xs text-[#9BA8B8]">registradas</span>
+          <Bookmark className="w-6 h-6 text-[color:var(--accent-color)]" />
+          <span className="text-xs font-bold uppercase text-[color:var(--muted-color)]">CARTAS</span>
+          <span className="text-2xl font-black text-[color:var(--fg-color)]">{cardCount}</span>
+          <span className="text-xs text-[color:var(--muted-color)]">registradas</span>
         </button>
 
         <button
           onClick={onDecks}
-          className="p-4 rounded-2xl bg-[#101722] border border-[#263446] hover:border-[#62A9FF]/50 transition text-left flex flex-col gap-2 cursor-pointer shadow-sm"
+          className="p-4 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] hover:border-[color:var(--accent-color)]/50 transition text-left flex flex-col gap-2 cursor-pointer shadow-sm"
         >
-          <Grid className="w-6 h-6 text-[#62A9FF]" />
-          <span className="text-xs font-bold uppercase text-[#9BA8B8]">MAZOS</span>
-          <span className="text-2xl font-black text-white">{deckCount}</span>
-          <span className="text-xs text-[#9BA8B8]">guardados</span>
+          <Grid className="w-6 h-6 text-[color:var(--accent-color)]" />
+          <span className="text-xs font-bold uppercase text-[color:var(--muted-color)]">MAZOS</span>
+          <span className="text-2xl font-black text-[color:var(--fg-color)]">{deckCount}</span>
+          <span className="text-xs text-[color:var(--muted-color)]">guardados</span>
         </button>
       </div>
 
       {/* Recent Activity */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white">Actividad reciente</h3>
-          <span className="text-xs text-[#9BA8B8]">Laboratorio</span>
+          <h3 className="text-lg font-bold text-[color:var(--fg-color)]">Actividad reciente</h3>
+          <span className="text-xs text-[color:var(--muted-color)]">Laboratorio</span>
         </div>
 
         {decks.length === 0 ? (
-          <div className="p-4 rounded-2xl bg-[#101722] border border-[#263446] flex items-center gap-3.5">
-            <div className="p-3 rounded-xl bg-[#162335] text-[#62A9FF]">
+          <div className="p-4 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-[color:var(--surface-raised)] text-[color:var(--accent-color)]">
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Sin actividad todavía</p>
-              <p className="text-xs text-[#9BA8B8] mt-0.5">
+              <p className="text-sm font-semibold text-[color:var(--fg-color)]">Sin actividad todavía</p>
+              <p className="text-xs text-[color:var(--muted-color)] mt-0.5">
                 Registra cartas o crea un mazo con IA para comenzar.
               </p>
             </div>
@@ -121,15 +121,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 key={deck.id}
                 onClick={onDecks}
-                className="p-3.5 rounded-2xl bg-[#101722] border border-[#263446] hover:border-[#62A9FF]/40 transition flex items-center justify-between text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] hover:border-[color:var(--accent-color)]/40 transition flex items-center justify-between text-left cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-[#162335] text-[#62A9FF]">
+                  <div className="p-2.5 rounded-xl bg-[color:var(--surface-raised)] text-[color:var(--accent-color)]">
                     <Grid className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white">{deck.name}</p>
-                    <p className="text-xs text-[#9BA8B8]">
+                    <p className="text-sm font-bold text-[color:var(--fg-color)]">{deck.name}</p>
+                    <p className="text-xs text-[color:var(--muted-color)]">
                       {deck.cardCount}/20 cartas · {deck.energyCount} energías
                     </p>
                   </div>
@@ -137,7 +137,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <span
                   className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                     deck.valid
-                      ? 'bg-blue-950 text-[#62A9FF] border border-blue-800/40'
+                      ? 'bg-blue-950 text-[color:var(--accent-color)] border border-blue-800/40'
                       : 'bg-amber-950 text-amber-400 border border-amber-800/40'
                   }`}
                 >

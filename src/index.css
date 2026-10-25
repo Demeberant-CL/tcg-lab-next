@@ -5,20 +5,81 @@
     --bg-color: #070B12;
     --surface-color: #101722;
     --surface-raised: #162335;
-    --accent-color: #62A9FF;
-    --accent-soft: #9CC9FF;
-    --muted-color: #9BA8B8;
+    --raised-hover: #20314a;
+    --image-bg: #0B111A;
     --border-color: #263446;
+    --accent-color: #62A9FF;
+    --accent-hover: #72b3ff;
+    --accent-soft: #9CC9FF;
+    --on-accent: #070B12;
+    --fg-color: #FFFFFF;
+    --muted-color: #9BA8B8;
+    --text-soft: #D0D8E3;
+    --hero-from: #173A60;
+    --hero-via: #12263D;
+    color-scheme: dark;
   }
 
   html.light {
-    --bg-color: #F7F9FC;
+    --bg-color: #F3F6FB;
     --surface-color: #FFFFFF;
     --surface-raised: #E8EEF6;
-    --accent-color: #1E5BB8;
-    --accent-soft: #3B6FB6;
-    --muted-color: #475569;
+    --raised-hover: #D9E3F1;
+    --image-bg: #EEF2F8;
     --border-color: #CBD5E1;
+    --accent-color: #1E5BB8;
+    --accent-hover: #2A6BCF;
+    --accent-soft: #2F5F9F;
+    --on-accent: #FFFFFF;
+    --fg-color: #0F172A;
+    --muted-color: #475569;
+    --text-soft: #334155;
+    color-scheme: light;
+
+    /* Los chips de color usan la paleta de Tailwind pensada para fondo oscuro:
+       se reasignan a tonos claros con texto oscuro legible. */
+    --color-blue-950: #DBEAFE;
+    --color-blue-800: #93C5FD;
+    --color-blue-700: #93C5FD;
+    --color-blue-600: #93C5FD;
+    --color-blue-400: #1D4ED8;
+    --color-emerald-950: #D1FAE5;
+    --color-emerald-800: #6EE7B7;
+    --color-emerald-600: #6EE7B7;
+    --color-emerald-400: #047857;
+    --color-amber-950: #FEF3C7;
+    --color-amber-800: #FCD34D;
+    --color-amber-700: #FCD34D;
+    --color-amber-500: #F59E0B;
+    --color-amber-400: #B45309;
+    --color-amber-600: #92400E;
+    --color-orange-950: #FFEDD5;
+    --color-orange-600: #FDBA74;
+    --color-orange-400: #C2410C;
+    --color-purple-950: #F3E8FF;
+    --color-purple-600: #D8B4FE;
+    --color-purple-400: #7E22CE;
+    --color-rose-950: #FFE4E6;
+    --color-rose-800: #FDA4AF;
+    --color-rose-400: #BE123C;
+    --color-slate-900: #E2E8F0;
+    --color-indigo-800: #A5B4FC;
+    --color-indigo-300: #4338CA;
+    --color-zinc-800: #E4E4E7;
+    --color-zinc-500: #A1A1AA;
+    --color-zinc-300: #3F3F46;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--fg-color);
+    /* Evita el rebote/recarga por arrastre en el móvil al hacer scroll. */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    touch-action: manipulation;
   }
 }
 
@@ -36,4 +97,39 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 165, 185, 0.4);
+}
+
+/* Utilidades usadas por los componentes (antes no estaban definidas). */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

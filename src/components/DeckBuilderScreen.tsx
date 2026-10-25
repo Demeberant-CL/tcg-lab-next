@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Plus, Minus, CheckCircle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, Plus, Minus, CheckCircle, Search } from 'lucide-react';
 import { CollectionCard, Deck, DeckCard, ENERGY_NAMES, ENERGY_COLORS } from '../types';
+import { DeckRules } from '../domain/deckRules';
+import { fold } from '../data/catalog';
 import { db } from '../data/database';
+import { CardImage } from './CardImage';
 
 interface DeckBuilderScreenProps {
   holdings: CollectionCard[];
@@ -17,70 +20,75 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
   const [name, setName] = useState('Mi mazo');
   const [selectedCards, setSelectedCards] = useState<Record<string, number>>({});
   const [energies, setEnergies] = useState<number[]>([1]);
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const availableHoldings = holdings.filter((h) => h.quantity > 0);
+  const availableHoldings = useMemo(() => holdings.filter((h) => h.quantity > 0), [holdings]);
+
+  const visibleHoldings = useMemo(() => {
+    const q = fold(search);
+    if (!q) return availableHoldings;
+    return availableHoldings.filter(
+      (h) => fold(h.name).includes(q) || fold(`${h.setCode} ${h.number}`).includes(q)
+    );
+  }, [availableHoldings, search]);
+
   const totalCount = Object.values(selectedCards).reduce((sum, q) => sum + q, 0);
+
+  // La regla de 2 copias se aplica por NOMBRE: dos impresiones distintas de la misma carta suman juntas.
+  const selectedByName = useMemo(() => {
+    const picked = availableHoldings
+      .filter((h) => selectedCards[h.key])
+      .map((h) => ({ name: h.name, quantity: selectedCards[h.key] }));
+    return DeckRules.copiesByName(picked);
+  }, [availableHoldings, selectedCards]);
 
   const handleToggleEnergy = (id: number) => {
     if (energies.includes(id)) {
-      if (energies.length > 1) {
-        setEnergies(energies.filter((e) => e !== id));
-      }
-    } else {
-      if (energies.length < 3) {
-        setEnergies([...energies, id].sort((a, b) => a - b));
-      }
+      if (energies.length > 1) setEnergies(energies.filter((e) => e !== id));
+    } else if (energies.length < DeckRules.MAX_ENERGIES) {
+      setEnergies([...energies, id].sort((a, b) => a - b));
     }
   };
 
-  const handleAdjustCount = (key: string, delta: 1 | -1, maxAvailable: number) => {
-    const current = selectedCards[key] || 0;
-    const maxAllowed = Math.min(2, maxAvailable);
+  const canAddCard = (card: CollectionCard): boolean => {
+    const current = selectedCards[card.key] || 0;
+    const nameCount = selectedByName.get(DeckRules.normalizeName(card.name)) || 0;
+    return (
+      current < card.quantity &&
+      nameCount < DeckRules.MAX_COPIES_PER_NAME &&
+      totalCount < DeckRules.DECK_SIZE
+    );
+  };
+
+  const handleAdjustCount = (card: CollectionCard, delta: 1 | -1) => {
+    const current = selectedCards[card.key] || 0;
 
     if (delta > 0) {
-      if (current < maxAllowed && totalCount < 20) {
-        setSelectedCards({ ...selectedCards, [key]: current + 1 });
-      }
-    } else {
-      if (current > 0) {
-        const next = current - 1;
-        const copy = { ...selectedCards };
-        if (next === 0) {
-          delete copy[key];
-        } else {
-          copy[key] = next;
-        }
-        setSelectedCards(copy);
-      }
+      if (canAddCard(card)) setSelectedCards({ ...selectedCards, [card.key]: current + 1 });
+    } else if (current > 0) {
+      const copy = { ...selectedCards };
+      if (current === 1) delete copy[card.key];
+      else copy[card.key] = current - 1;
+      setSelectedCards(copy);
     }
   };
 
   const handleSave = () => {
     setError(null);
     try {
-      const cards: DeckCard[] = [];
-      availableHoldings.forEach((h) => {
-        const qty = selectedCards[h.key] || 0;
-        if (qty > 0) {
-          cards.push({
-            setCode: h.setCode,
-            number: h.number,
-            name: h.name,
-            category: h.category,
-            quantity: qty,
-            imageUrl: h.imageUrl,
-          });
-        }
-      });
+      const cards: DeckCard[] = availableHoldings
+        .filter((h) => selectedCards[h.key] > 0)
+        .map((h) => ({
+          setCode: h.setCode,
+          number: h.number,
+          name: h.name,
+          category: h.category,
+          quantity: selectedCards[h.key],
+          imageUrl: h.imageUrl,
+        }));
 
-      const deck: Deck = {
-        id: 0,
-        name: name.trim() || 'Mi mazo',
-        cards,
-        energies,
-      };
-
+      const deck: Deck = { id: 0, name: name.trim() || 'Mi mazo', cards, energies };
       db.saveDeck(deck);
       onSaved();
     } catch (err) {
@@ -88,7 +96,10 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
     }
   };
 
-  const isComplete = totalCount === 20 && energies.length >= 1 && energies.length <= 3;
+  const isComplete =
+    totalCount === DeckRules.DECK_SIZE &&
+    energies.length >= DeckRules.MIN_ENERGIES &&
+    energies.length <= DeckRules.MAX_ENERGIES;
 
   return (
     <div className="flex flex-col gap-4 p-5 pb-24 max-w-2xl mx-auto">
@@ -96,36 +107,41 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
       <div className="flex items-center gap-3">
         <button
           onClick={onCancel}
-          className="p-2 rounded-xl bg-[#162335] text-[#9BA8B8] hover:text-white cursor-pointer"
+          aria-label="Volver"
+          className="p-2 rounded-xl bg-[color:var(--surface-raised)] text-[color:var(--muted-color)] hover:text-[color:var(--fg-color)] cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Nuevo mazo</h1>
-          <p className="text-xs text-[#9BA8B8]">Regla: exactamente 20 cartas y 1-3 tipos de energía</p>
+          <h1 className="text-xl font-bold text-[color:var(--fg-color)]">Nuevo mazo</h1>
+          <p className="text-xs text-[color:var(--muted-color)]">
+            Regla: exactamente 20 cartas, máx. 2 por nombre y 1-3 tipos de energía
+          </p>
         </div>
       </div>
 
       {/* Name Input */}
       <div>
-        <label className="text-xs font-semibold text-[#9BA8B8] mb-1.5 block">
+        <label htmlFor="deck-name" className="text-xs font-semibold text-[color:var(--muted-color)] mb-1.5 block">
           Nombre del mazo
         </label>
         <input
+          id="deck-name"
           type="text"
           value={name}
+          maxLength={60}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ej.: Charizard Agresivo"
-          className="w-full px-4 py-2.5 rounded-2xl bg-[#101722] border border-[#263446] text-white text-sm focus:outline-none focus:border-[#62A9FF]"
+          className="w-full px-4 py-2.5 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] text-[color:var(--fg-color)] text-sm focus:outline-none focus:border-[color:var(--accent-color)]"
         />
       </div>
 
       {/* Counter bar */}
-      <div className="p-4 rounded-2xl bg-[#101722] border border-[#263446] flex items-center justify-between">
+      <div className="p-4 rounded-2xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] flex items-center justify-between">
         <div>
-          <p className="text-xs text-[#9BA8B8]">Progreso del mazo</p>
-          <p className="text-base font-bold text-white">
-            <span className={totalCount === 20 ? 'text-[#62A9FF]' : 'text-amber-400'}>
+          <p className="text-xs text-[color:var(--muted-color)]">Progreso del mazo</p>
+          <p className="text-base font-bold text-[color:var(--fg-color)]">
+            <span className={totalCount === 20 ? 'text-[color:var(--accent-color)]' : 'text-amber-400'}>
               {totalCount}
             </span>{' '}
             / 20 cartas
@@ -141,9 +157,9 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
 
       {/* Energies Selector */}
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-semibold text-[#9BA8B8]">
+        <span className="text-xs font-semibold text-[color:var(--muted-color)]">
           Tipos de Energía ({energies.length}/3)
-        </label>
+        </span>
         <div className="flex flex-wrap gap-2">
           {([1, 2, 3, 4, 5, 6, 7, 8] as const).map((eId) => {
             const isSelected = energies.includes(eId);
@@ -152,10 +168,11 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
               <button
                 key={eId}
                 onClick={() => handleToggleEnergy(eId)}
+                aria-pressed={isSelected}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                   isSelected
                     ? `${style.bg} ${style.text} border ${style.border} font-bold shadow-sm`
-                    : 'bg-[#101722] text-[#9BA8B8] border border-[#263446] hover:bg-[#162335]'
+                    : 'bg-[color:var(--surface-color)] text-[color:var(--muted-color)] border border-[color:var(--border-color)] hover:bg-[color:var(--surface-raised)]'
                 }`}
               >
                 <span>{ENERGY_NAMES[eId]}</span>
@@ -168,77 +185,90 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({
 
       {/* Available Holdings Card Picker */}
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-semibold text-[#9BA8B8]">
+        <span className="text-xs font-semibold text-[color:var(--muted-color)]">
           Cartas disponibles en colección ({availableHoldings.length})
-        </label>
+        </span>
 
         {availableHoldings.length === 0 ? (
-          <p className="text-xs text-[#9BA8B8] p-4 bg-[#101722] rounded-xl border border-[#263446]">
+          <p className="text-xs text-[color:var(--muted-color)] p-4 bg-[color:var(--surface-color)] rounded-xl border border-[color:var(--border-color)]">
             No tienes cartas registradas en tu colección. Añade cartas en la pestaña Colección primero.
           </p>
         ) : (
-          <div className="flex flex-col gap-2 max-h-[360px] overflow-y-auto pr-1">
-            {availableHoldings.map((card) => {
-              const qty = selectedCards[card.key] || 0;
-              const maxAllowed = Math.min(2, card.quantity);
-              const canAdd = qty < maxAllowed && totalCount < 20;
+          <>
+            <div className="relative">
+              <Search className="w-4 h-4 text-[color:var(--muted-color)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filtrar por nombre o ID..."
+                aria-label="Filtrar cartas disponibles"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] text-[color:var(--fg-color)] text-xs placeholder:text-[color:var(--muted-color)] focus:outline-none focus:border-[color:var(--accent-color)]"
+              />
+            </div>
 
-              return (
-                <div
-                  key={card.key}
-                  className="p-3 rounded-xl bg-[#101722] border border-[#263446] flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <img
-                      src={card.imageUrl}
-                      alt={card.name}
-                      className="w-10 h-14 object-contain rounded bg-[#0B111A]"
-                    />
-                    <div className="truncate">
-                      <p className="text-sm font-semibold text-white truncate">{card.name}</p>
-                      <p className="text-[11px] text-[#9BA8B8]">
-                        {card.setCode} #{card.number} · posees {card.quantity} (máx 2 en mazo)
-                      </p>
+            <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
+              {visibleHoldings.length === 0 && (
+                <p className="text-xs text-[color:var(--muted-color)] p-3">Sin coincidencias.</p>
+              )}
+              {visibleHoldings.map((card) => {
+                const qty = selectedCards[card.key] || 0;
+                return (
+                  <div
+                    key={card.key}
+                    className="p-3 rounded-xl bg-[color:var(--surface-color)] border border-[color:var(--border-color)] flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <CardImage
+                        set={card.setCode}
+                        number={card.number}
+                        alt={card.name}
+                        className="w-10 h-14 shrink-0 object-contain rounded bg-[color:var(--image-bg)]"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[color:var(--fg-color)] truncate">{card.name}</p>
+                        <p className="text-[11px] text-[color:var(--muted-color)]">
+                          {card.setCode} #{card.number} · posees {card.quantity} (máx 2 por nombre)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAdjustCount(card, -1)}
+                        disabled={qty <= 0}
+                        aria-label={`Quitar ${card.name} del mazo`}
+                        className="p-1.5 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--muted-color)] hover:text-[color:var(--fg-color)] disabled:opacity-20 cursor-pointer"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-sm font-bold text-[color:var(--fg-color)] w-5 text-center">{qty}</span>
+                      <button
+                        onClick={() => handleAdjustCount(card, 1)}
+                        disabled={!canAddCard(card)}
+                        aria-label={`Añadir ${card.name} al mazo`}
+                        className="p-1.5 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--accent-color)] hover:bg-[color:var(--accent-color)] hover:text-[color:var(--on-accent)] disabled:opacity-20 transition cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleAdjustCount(card.key, -1, card.quantity)}
-                      disabled={qty <= 0}
-                      className="p-1.5 rounded-lg bg-[#162335] text-[#9BA8B8] hover:text-white disabled:opacity-20 cursor-pointer"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-sm font-bold text-white w-5 text-center">
-                      {qty}
-                    </span>
-                    <button
-                      onClick={() => handleAdjustCount(card.key, 1, card.quantity)}
-                      disabled={!canAdd}
-                      className="p-1.5 rounded-lg bg-[#162335] text-[#62A9FF] hover:bg-[#62A9FF] hover:text-slate-950 disabled:opacity-20 transition cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
       {error && (
-        <p className="text-xs text-rose-400 bg-rose-950/40 border border-rose-800/40 p-3 rounded-xl">
-          {error}
-        </p>
+        <p className="text-xs text-rose-400 bg-rose-950/40 border border-rose-800/40 p-3 rounded-xl">{error}</p>
       )}
 
       {/* Save Button */}
       <button
         onClick={handleSave}
         disabled={!isComplete}
-        className="w-full py-3.5 rounded-2xl bg-[#62A9FF] hover:bg-[#72b3ff] text-slate-950 font-bold text-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer mt-2"
+        className="w-full py-3.5 rounded-2xl bg-[color:var(--accent-color)] hover:bg-[color:var(--accent-hover)] text-[color:var(--on-accent)] font-bold text-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer mt-2"
       >
         Guardar mazo
       </button>
